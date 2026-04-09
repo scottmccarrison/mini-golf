@@ -199,17 +199,20 @@ function wireSession(sess) {
 // ---------------------------------------------------------------------------
 
 const mpModal = document.getElementById('mp-modal');
-const mpBtn = document.createElement('button');
-mpBtn.id = 'mp-open-btn';
-mpBtn.type = 'button';
-mpBtn.title = 'Multiplayer';
-mpBtn.textContent = '\uD83C\uDFC4'; // golfer emoji
-document.getElementById('top-right').insertBefore(mpBtn, document.getElementById('help-btn'));
+const titleButtons = document.getElementById('title-buttons');
+const btnSolo = document.getElementById('btn-solo');
+const btnMulti = document.getElementById('btn-multi');
 
-mpBtn.addEventListener('click', () => {
-  if (game.state !== 'title' && game.state !== 'gameover' && game.mode !== 'mp') {
-    return; // don't open mid-game
-  }
+function showTitleButtons() { titleButtons.classList.remove('hidden'); }
+function hideTitleButtons() { titleButtons.classList.add('hidden'); }
+
+btnSolo.addEventListener('click', () => {
+  game.titleStart = true;
+  hideTitleButtons();
+});
+
+btnMulti.addEventListener('click', () => {
+  hideTitleButtons();
   resetMpModal();
   showMpModal();
 });
@@ -255,6 +258,7 @@ document.getElementById('mp-cancel').addEventListener('click', () => {
   if (session) { session.close(); session = null; }
   resetMpModal();
   hideMpModal();
+  showTitleButtons();
 });
 
 // Force uppercase on join code input
@@ -288,18 +292,24 @@ initInput(canvas, () => {
   return worldToScreen(game.ball.x, game.ball.y, game, viewport);
 });
 
-// Title/gameover tap-to-start handler (canvas click)
-canvas.addEventListener('pointerdown', () => {
-  if (game.state === 'title' || game.state === 'gameover') {
-    game.titleStart = true;
+// Spacebar starts solo from title, restarts from gameover
+document.addEventListener('keydown', (e) => {
+  if (e.code === 'Space') {
+    if (game.state === 'title') {
+      game.titleStart = true;
+      hideTitleButtons();
+      e.preventDefault();
+    } else if (game.state === 'gameover') {
+      game.titleStart = true;
+      e.preventDefault();
+    }
   }
 });
 
-// Spacebar to start from title or gameover
-document.addEventListener('keydown', (e) => {
-  if (e.code === 'Space' && (game.state === 'title' || game.state === 'gameover')) {
+// Show title buttons when returning to title or gameover
+canvas.addEventListener('pointerdown', () => {
+  if (game.state === 'gameover') {
     game.titleStart = true;
-    e.preventDefault();
   }
 });
 
@@ -368,6 +378,15 @@ function gameLoop(timestamp) {
   // Reset input AFTER processing a released shot so the state machine saw it
   if (rawInput.released) {
     resetInput();
+  }
+
+  // Sync title button visibility
+  if (game.state === 'title') {
+    showTitleButtons();
+  } else if (game.state === 'gameover' && game.mode === 'solo') {
+    showTitleButtons();
+  } else {
+    hideTitleButtons();
   }
 
   // Render current frame

@@ -932,13 +932,7 @@ function drawTitleScreen(ctx, game, viewport) {
   ctx.fillStyle = 'rgba(255,255,255,0.45)';
   ctx.fillText('mccarrison.me/golf', w / 2, h * 0.28 + Math.min(72, w / 5) * 0.75);
 
-  // Pulsing "Tap to Play"
-  const pulse = 0.7 + 0.3 * Math.sin(time * 3);
-  ctx.globalAlpha = pulse;
-  ctx.font = `bold ${Math.min(22, w / 18)}px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif`;
-  ctx.fillStyle = '#4ecdc4';
-  ctx.fillText('Tap to Play', w / 2, h * 0.82);
-  ctx.globalAlpha = 1;
+  // Buttons are rendered via HTML overlay (#title-buttons)
 }
 
 // ---------------------------------------------------------------------------
