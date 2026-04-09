@@ -198,6 +198,8 @@ function wireSession(sess) {
   });
 
   sess.on('chat', data => {
+    // Skip own messages - already added optimistically in sendChatMessage()
+    if (data.id === sess.id) return;
     addChatMessage(game, data.id, data.name, data.text);
     appendChatMessageToDOM(data.name, data.text, data.id);
     // Flash unread indicator if chat is closed
