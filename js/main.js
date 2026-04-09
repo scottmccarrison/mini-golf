@@ -13,6 +13,20 @@ const ctx = canvas.getContext('2d');
 
 let viewport = { w: 0, h: 0, dpr: 1 };
 let game = createGame();
+
+// Debug: expose game for console inspection. Remove before prod deploy.
+window._dbg = {
+  get game() { return game; },
+  jumpToHole(n) {
+    game.state = 'aiming';
+    game.currentHole = n;
+    game.strokes = 0;
+    game.trail = [];
+    const c = COURSES[n];
+    if (c) { game.ball = { x: c.tee.x, y: c.tee.y, vx: 0, vy: 0 }; }
+    game.zoom = { level: 1, panX: 0, panY: 0 };
+  },
+};
 let lastTime = 0;
 let accumulator = 0;
 
