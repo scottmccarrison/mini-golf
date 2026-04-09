@@ -11,8 +11,8 @@
 // ---------------------------------------------------------------------------
 
 export const BALL_RADIUS = 6;
-export const HOLE_RADIUS = 12;
-export const SINK_SPEED = 60;       // px/s - ball sinks if slower than this near hole
+export const HOLE_RADIUS = 16;
+export const SINK_SPEED = 120;      // px/s - ball sinks if slower than this near hole
 export const FRICTION = 0.985;      // velocity multiplier per frame (green)
 export const SAND_FRICTION = 0.94;  // velocity multiplier per frame (sand)
 export const STOP_SPEED = 5;        // px/s - ball stops below this
