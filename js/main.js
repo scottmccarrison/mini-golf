@@ -8,6 +8,7 @@ import { render, worldToScreen, screenToWorld } from './render.js';
 import { createGame, updateGame, startMultiplayerGame, applyShot, applyBallUpdate, applyTurnComplete, applyTurnStart, applyHoleComplete, applyGameOver, addChatMessage } from './game.js';
 import { createSession } from './net.js';
 import { fetchLeaderboard, submitScore, recordPersonalBest, getPersonalBests } from './leaderboard.js';
+import { CHANGELOG } from './changelog.js';
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -388,6 +389,70 @@ document.getElementById('btn-htp').addEventListener('click', () => {
 document.getElementById('htp-close').addEventListener('click', () => {
   htpModal.classList.add('hidden');
   showTitleButtons();
+});
+
+// ---------------------------------------------------------------------------
+// Feedback / What's New modal
+// ---------------------------------------------------------------------------
+
+const fbModal = document.getElementById('feedback-modal');
+const fbText = document.getElementById('fb-text');
+const fbStatus = document.getElementById('fb-status');
+const fbSend = document.getElementById('fb-send');
+const fbCancel = document.getElementById('fb-cancel');
+const clBody = document.getElementById('changelog-body');
+
+// Render changelog
+function renderChangelog() {
+  if (!clBody) return;
+  clBody.innerHTML = CHANGELOG.map(v => {
+    const items = v.items.map(i => `<li>${escapeHtml(i)}</li>`).join('');
+    return `<div class="cl-version"><div class="cl-ver">${escapeHtml(v.version)}</div><ul>${items}</ul></div>`;
+  }).join('');
+}
+renderChangelog();
+
+function openFeedback() {
+  fbModal.classList.remove('hidden');
+  fbText.value = '';
+  fbStatus.textContent = '';
+  fbSend.disabled = false;
+  fbCancel.disabled = false;
+}
+
+function closeFeedback() {
+  fbModal.classList.add('hidden');
+}
+
+document.getElementById('help-btn').addEventListener('click', openFeedback);
+fbCancel.addEventListener('click', closeFeedback);
+fbModal.addEventListener('click', (e) => { if (e.target === fbModal) closeFeedback(); });
+
+fbSend.addEventListener('click', async () => {
+  const message = fbText.value.trim();
+  if (message.length < 3) {
+    fbStatus.textContent = 'add a few more words first';
+    return;
+  }
+  fbSend.disabled = true;
+  fbCancel.disabled = true;
+  fbStatus.textContent = 'sending...';
+  try {
+    const seg = location.pathname.split('/')[1] || '';
+    const apiBase = (seg === 'golf' || seg === 'golfdev') ? `/${seg}/api` : '/api';
+    const r = await fetch(`${apiBase}/feedback`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ message }),
+    });
+    if (!r.ok) throw new Error('http ' + r.status);
+    fbStatus.textContent = 'thanks! sent.';
+    setTimeout(closeFeedback, 900);
+  } catch (e) {
+    fbStatus.textContent = 'failed to send - try again later';
+    fbSend.disabled = false;
+    fbCancel.disabled = false;
+  }
 });
 
 // ---------------------------------------------------------------------------

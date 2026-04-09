@@ -122,40 +122,39 @@ html, body {
 #mp-modal.hidden { display: none; }
 
 .fb-card {
-  background: #fff;
-  border: 2px solid var(--ink);
+  background: rgba(20, 25, 50, 0.95);
+  border: 1px solid rgba(78, 205, 196, 0.25);
+  color: #fff;
   border-radius: 12px;
   padding: 18px;
   width: 100%;
   max-width: 360px;
+  max-height: 80vh;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
-/* Dark theme override for multiplayer modal card */
-#mp-modal .fb-card {
-  background: rgba(20, 25, 50, 0.95);
-  border: 1px solid rgba(78, 205, 196, 0.25);
-  color: #ffffff;
-}
+/* (mp-modal inherits dark fb-card styling) */
 
 .fb-title {
   font: bold 18px -apple-system, system-ui, sans-serif;
+  color: #4ecdc4;
 }
 
 #fb-text {
   width: 100%;
   font: 14px -apple-system, system-ui, sans-serif;
   padding: 10px;
-  border: 2px solid rgba(26, 26, 26, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 8px;
   resize: vertical;
   outline: none;
   -webkit-user-select: text;
   user-select: text;
-  background: #fff;
-  color: var(--ink);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
 }
 
 #fb-text:focus {
@@ -164,7 +163,7 @@ html, body {
 
 #fb-status {
   font: 13px -apple-system, system-ui, sans-serif;
-  color: #666;
+  color: rgba(255, 255, 255, 0.5);
   min-height: 16px;
 }
 
@@ -178,9 +177,9 @@ html, body {
   font: 14px -apple-system, system-ui, sans-serif;
   padding: 8px 14px;
   border-radius: 8px;
-  border: 2px solid rgba(26, 26, 26, 0.45);
-  background: #fff;
-  color: var(--ink);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.7);
   cursor: pointer;
   touch-action: manipulation;
 }
@@ -200,6 +199,43 @@ html, body {
 #fb-cancel:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.fb-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.1);
+  margin: 4px 0;
+}
+
+#changelog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font: 13px -apple-system, system-ui, sans-serif;
+}
+
+.cl-version {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cl-ver {
+  font-weight: 700;
+  color: #f9d423;
+  font-size: 13px;
+}
+
+#changelog-body ul {
+  margin: 0;
+  padding-left: 18px;
+  list-style: disc;
+}
+
+#changelog-body li {
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1.5;
+  font-size: 12px;
 }
 
 /* Multiplayer modal */

@@ -36,7 +36,7 @@ export default {
 
     // --- Feedback ---
     if (path === '/api/feedback' && request.method === 'POST') {
-      return json({ ok: true });
+      return handleFeedback(request, env);
     }
 
     // --- Room create ---
@@ -135,6 +135,44 @@ function generateRoomCode() {
   let s = '';
   for (let i = 0; i < 4; i++) s += ALPHABET[buf[i] % ALPHABET.length];
   return s;
+}
+
+async function handleFeedback(request, env) {
+  const body = await request.json().catch(() => ({}));
+  const message = String(body.message ?? '').trim().slice(0, 4000);
+  if (message.length < 3) {
+    return json({ error: 'message too short' }, 400);
+  }
+
+  if (!env.GITHUB_TOKEN) {
+    return json({ error: 'feedback not configured' }, 500);
+  }
+
+  const firstLine = message.split('\n')[0].slice(0, 60);
+  const title = `feedback: ${firstLine}`;
+  const issueBody =
+    `${message}\n\n---\n_submitted via in-game feedback button_`;
+
+  const r = await fetch(
+    'https://api.github.com/repos/scottmccarrison/mini-golf/issues',
+    {
+      method: 'POST',
+      headers: {
+        'authorization': `Bearer ${env.GITHUB_TOKEN}`,
+        'accept': 'application/vnd.github+json',
+        'user-agent': 'mini-golf-feedback',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ title, body: issueBody, labels: ['feedback'] }),
+    }
+  );
+
+  if (!r.ok) {
+    const text = await r.text();
+    return json({ error: 'github error', status: r.status, detail: text.slice(0, 500) }, 502);
+  }
+  const data = await r.json();
+  return json({ ok: true, url: data.html_url });
 }
 
 function json(obj, status = 200) {
