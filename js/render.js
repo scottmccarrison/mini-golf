@@ -913,7 +913,8 @@ function drawMpBottomBar(ctx, game, viewport) {
   const { w, h } = viewport;
   const players = game.players;
   const rowH = 18;
-  const barH = rowH * players.length + 4;
+  const headerH = 14;
+  const barH = headerH + rowH * players.length + 4;
   const barY = h - barH;
   const currentHole = game.currentHole || 0;
 
@@ -929,11 +930,25 @@ function drawMpBottomBar(ctx, game, viewport) {
   const holeAreaW = w - nameColW - totColW;
   const holeColW = holeAreaW / 9;
 
+  // Header row: hole numbers 1-9 + TOT
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = '9px -apple-system, system-ui, sans-serif';
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  for (let hi = 0; hi < 9; hi++) {
+    const colX = nameColW + hi * holeColW + holeColW / 2;
+    const isCurrentH = hi === currentHole;
+    if (isCurrentH) ctx.fillStyle = 'rgba(78,205,196,0.6)';
+    ctx.fillText(String(hi + 1), colX, barY + headerH / 2 + 1);
+    if (isCurrentH) ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  }
+  ctx.fillText('TOT', w - totColW / 2, barY + headerH / 2 + 1);
+
   for (let pi = 0; pi < players.length; pi++) {
     const player = players[pi];
     const isActive = player.id === game.currentTurnPlayerId;
     const isMe = player.id === game.myId;
-    const ry = barY + 2 + pi * rowH;
+    const ry = barY + headerH + 2 + pi * rowH;
     const sc = player.scorecard || [];
 
     // Active turn row highlight
