@@ -465,6 +465,18 @@ export function applyHoleComplete(game, holeIndex, scores, nextHole) {
     game.scorecard[holeIndex] = scores[game.myId][holeIndex];
   }
   game.currentHole = nextHole;
+  game.strokes = 0;
+  game.trail = [];
+  game._trailStepCount = 0;
+  // Reset local ball and all remote balls to the new tee
+  placeBallAtTee(game, nextHole);
+  const course = COURSES[nextHole];
+  if (course && game.balls) {
+    for (const pid of Object.keys(game.balls)) {
+      game.balls[pid] = { x: course.tee.x, y: course.tee.y, vx: 0, vy: 0 };
+    }
+  }
+  game.zoom = { level: 1, panX: 0, panY: 0 };
 }
 
 /**

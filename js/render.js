@@ -912,8 +912,10 @@ function drawScoreTicker(ctx, game, viewport) {
 function drawMpBottomBar(ctx, game, viewport) {
   const { w, h } = viewport;
   const players = game.players;
-  const barH = 44;
+  const rowH = 18;
+  const barH = rowH * players.length + 4;
   const barY = h - barH;
+  const currentHole = game.currentHole || 0;
 
   // Background
   ctx.fillStyle = 'rgba(0,0,0,0.45)';
@@ -921,57 +923,75 @@ function drawMpBottomBar(ctx, game, viewport) {
   ctx.fillStyle = 'rgba(255,255,255,0.07)';
   ctx.fillRect(0, barY, w, 1);
 
-  const totalPar = COURSES.reduce((s, c) => s + c.par, 0);
-  const slotW = w / players.length;
+  // Layout: [name col] [hole 1] [hole 2] ... [hole 9] [TOT]
+  const nameColW = 56;
+  const totColW = 30;
+  const holeAreaW = w - nameColW - totColW;
+  const holeColW = holeAreaW / 9;
 
-  for (let i = 0; i < players.length; i++) {
-    const player = players[i];
+  for (let pi = 0; pi < players.length; pi++) {
+    const player = players[pi];
     const isActive = player.id === game.currentTurnPlayerId;
     const isMe = player.id === game.myId;
-    const slotX = i * slotW;
-    const centerX = slotX + slotW / 2;
+    const ry = barY + 2 + pi * rowH;
+    const sc = player.scorecard || [];
 
-    // Active turn highlight
+    // Active turn row highlight
     if (isActive) {
-      ctx.fillStyle = 'rgba(78,205,196,0.15)';
-      ctx.fillRect(slotX, barY + 1, slotW, barH - 2);
-      // Top accent line
-      ctx.fillStyle = '#4ecdc4';
-      ctx.fillRect(slotX + 4, barY + 1, slotW - 8, 2);
+      ctx.fillStyle = 'rgba(78,205,196,0.12)';
+      ctx.fillRect(0, ry, w, rowH);
     }
 
-    // Color dot - left of center
-    const dotR = 4;
+    // Color dot + name
     ctx.beginPath();
-    ctx.arc(slotX + 12, barY + 15, dotR, 0, Math.PI * 2);
+    ctx.arc(8, ry + rowH / 2, 3, 0, Math.PI * 2);
     ctx.fillStyle = player.color || '#4ecdc4';
     ctx.fill();
 
-    // Name - after dot
     let name = player.name || `P${player.id}`;
-    if (name.length > 8) name = name.slice(0, 7) + '.';
+    if (name.length > 5) name = name.slice(0, 5);
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
-    ctx.font = (isMe ? 'bold ' : '') + '11px -apple-system, system-ui, sans-serif';
-    ctx.fillStyle = isActive ? '#4ecdc4' : (isMe ? '#ffffff' : 'rgba(255,255,255,0.7)');
-    ctx.fillText(name, slotX + 22, barY + 15);
+    ctx.font = (isMe ? 'bold ' : '') + '10px -apple-system, system-ui, sans-serif';
+    ctx.fillStyle = isActive ? '#4ecdc4' : (isMe ? '#fff' : 'rgba(255,255,255,0.6)');
+    ctx.fillText(name, 16, ry + rowH / 2);
 
-    // Total score below
-    let total = (player.scorecard || []).reduce((s, v) => s + (v !== null ? v : 0), 0);
-    if (isMe) total += (game.strokes || 0);
-    const scoreStr = total > 0 ? String(total) : '-';
-
+    // Per-hole scores
+    let total = 0;
     ctx.textAlign = 'center';
-    ctx.font = 'bold 13px -apple-system, system-ui, sans-serif';
-    ctx.fillStyle = isActive ? '#4ecdc4' : '#ffffff';
-    ctx.fillText(scoreStr, centerX, barY + 32);
+    for (let hi = 0; hi < 9; hi++) {
+      const colX = nameColW + hi * holeColW + holeColW / 2;
+      const score = sc[hi];
+      const holePar = COURSES[hi] ? COURSES[hi].par : 3;
+
+      if (score !== null && score !== undefined) {
+        total += score;
+        const diff = score - holePar;
+        ctx.font = (diff !== 0 ? 'bold ' : '') + '10px -apple-system, system-ui, sans-serif';
+        ctx.fillStyle = diff < 0 ? '#4ecdc4' : diff > 0 ? '#ff6b6b' : '#fff';
+        ctx.fillText(String(score), colX, ry + rowH / 2);
+      } else if (hi === currentHole && isMe) {
+        // Current hole in-progress
+        const strokes = game.strokes || 0;
+        if (strokes > 0) {
+          ctx.font = '10px -apple-system, system-ui, sans-serif';
+          ctx.fillStyle = 'rgba(78,205,196,0.6)';
+          ctx.fillText(String(strokes), colX, ry + rowH / 2);
+        }
+      }
+    }
+
+    // Total
+    if (isMe) total += (game.strokes || 0);
+    ctx.font = 'bold 10px -apple-system, system-ui, sans-serif';
+    ctx.fillStyle = isActive ? '#4ecdc4' : '#fff';
+    ctx.fillText(total > 0 ? String(total) : '-', w - totColW / 2, ry + rowH / 2);
   }
 
-  // Dividers between slots
-  ctx.fillStyle = 'rgba(255,255,255,0.06)';
-  for (let i = 1; i < players.length; i++) {
-    ctx.fillRect(i * slotW, barY + 6, 1, barH - 12);
-  }
+  // Current hole column highlight
+  const hlX = nameColW + currentHole * holeColW;
+  ctx.fillStyle = 'rgba(78,205,196,0.08)';
+  ctx.fillRect(hlX, barY + 1, holeColW, barH - 2);
 }
 
 function drawSoloBottomBar(ctx, game, viewport) {
