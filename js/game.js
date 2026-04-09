@@ -47,6 +47,7 @@ export function createGame() {
       hazardTimer: 0,
       shakeMagnitude: 0,
     },
+    zoom: { level: 1, panX: 0, panY: 0 },
     playerColor: '#4ecdc4',
     playerName: '',
     titleStart: false,
@@ -148,11 +149,13 @@ function updateAiming(game, rawInput) {
   game.input = rawInput;
 
   if (rawInput.released && rawInput.shotPower > 0) {
-    const actualPower = rawInput.shotPower * MAX_POWER;
+    // Quadratic power curve: low drags stay gentle, long drags ramp up aggressively
+    const curvedPower = rawInput.shotPower * rawInput.shotPower;
+    const actualPower = curvedPower * MAX_POWER;
     launchBall(game.ball, rawInput.shotAngle, actualPower);
     game.strokes += 1;
     game.lastBallPos = { x: game.ball.x, y: game.ball.y };
-    game.animState.shakeMagnitude = rawInput.shotPower * 3;
+    game.animState.shakeMagnitude = curvedPower * 3;
     game.state = 'rolling';
     // resetInput() is called by main.js after this returns
   }
@@ -254,6 +257,8 @@ function updateNextHole(game, dt) {
     game._trailStepCount = 0;
     placeBallAtTee(game, game.currentHole);
     game.animState.holeTransitionPhase = 'in';
+    // Reset zoom for new hole
+    game.zoom = { level: 1, panX: 0, panY: 0 };
   }
 
   if (game.animState.holeTransition >= 1) {
