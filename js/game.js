@@ -338,9 +338,10 @@ export function getTotalPar(game) {
  * @param {string|number} myId - this client's player ID
  * @param {object[]} players - array of {id, name, color}
  */
-export function startMultiplayerGame(game, turnOrder, myId, players) {
+export function startMultiplayerGame(game, turnOrder, myId, players, roomCode) {
   game.mode = 'mp';
   game.myId = myId;
+  game.roomCode = roomCode;
   game.turnOrder = turnOrder;
   game.currentTurnPlayerId = turnOrder[0];
   game.currentHole = 0;
@@ -352,10 +353,14 @@ export function startMultiplayerGame(game, turnOrder, myId, players) {
   // Build players array with scorecards
   game.players = players.map(p => ({
     id: p.id,
-    name: p.name,
+    name: p.name || `P${p.id}`,
     color: p.color,
     scorecard: Array(9).fill(null),
   }));
+
+  // Set local player color from the players list
+  const me = game.players.find(p => p.id === myId);
+  if (me) game.playerColor = me.color;
 
   // Remote balls keyed by player ID (for spectating display)
   game.balls = {};

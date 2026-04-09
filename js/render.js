@@ -478,9 +478,9 @@ function drawTrail(ctx, trail) {
 // ---------------------------------------------------------------------------
 
 function drawOtherBalls(ctx, balls) {
-  if (!balls || balls.length === 0) return;
+  if (!balls || !Array.isArray(balls) || balls.length === 0) return;
   for (const ball of balls) {
-    if (!ball) continue;
+    if (!ball || ball.x === undefined) continue;
     const color = ball.color || '#4ecdc4';
 
     // Shadow
@@ -641,7 +641,15 @@ function drawAimLine(ctx, ball, input) {
     ctx.lineCap = 'round';
     ctx.stroke();
 
-    // Arrow head
+    // Arrow head - color matches gradient position at current power level
+    let arrowColor;
+    if (curvedPower < 0.25) {
+      arrowColor = '#4ecdc4'; // teal at low power
+    } else if (curvedPower < 0.6) {
+      arrowColor = '#f9d423'; // yellow at medium power
+    } else {
+      arrowColor = '#ff6b6b'; // red at high power
+    }
     const arrowSize = 8;
     const arrowAngle = shotAngle;
     ctx.beginPath();
@@ -655,7 +663,7 @@ function drawAimLine(ctx, ball, input) {
       pEndY - Math.sin(arrowAngle + 0.4) * arrowSize
     );
     ctx.closePath();
-    ctx.fillStyle = '#ff6b6b';
+    ctx.fillStyle = arrowColor;
     ctx.fill();
   }
 
@@ -749,8 +757,66 @@ function drawTopBar(ctx, game, viewport) {
     ctx.arc(rightX - 6, midY, 5, 0, Math.PI * 2);
     ctx.fillStyle = dotColor;
     ctx.fill();
+  } else if (game.playerName) {
+    // Solo mode - show player name
+    ctx.font = '13px -apple-system, system-ui, sans-serif';
+    ctx.fillStyle = '#aaaaaa';
+    ctx.fillText(game.playerName, rightX, midY);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// HUD: Multiplayer turn indicator
+// ---------------------------------------------------------------------------
+
+function drawMpTurnIndicator(ctx, game, viewport) {
+  if (!game.players || game.players.length === 0) return;
+  if (game.mode !== 'mp') return;
+
+  const { w } = viewport;
+  const isMyTurn = game.currentTurnPlayerId === game.myId;
+  const time = game.time || 0;
+
+  if (isMyTurn) {
+    // Prominent "YOUR TURN" banner
+    const bannerH = 34;
+    const bannerY = 48; // just below top bar
+
+    // Background strip
+    ctx.fillStyle = 'rgba(78, 205, 196, 0.18)';
+    ctx.fillRect(0, bannerY, w, bannerH);
+
+    // Bottom border accent
+    ctx.fillStyle = 'rgba(78, 205, 196, 0.5)';
+    ctx.fillRect(0, bannerY + bannerH - 1, w, 1);
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = 'bold 15px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
+    ctx.fillStyle = '#4ecdc4';
+    ctx.fillText('YOUR TURN', w / 2, bannerY + bannerH / 2);
   } else {
-    // Solo - just show nothing extra on the right
+    // Waiting indicator with pulse
+    const waitPlayer = game.players.find(p => p.id === game.currentTurnPlayerId);
+    if (!waitPlayer) return;
+
+    const bannerH = 30;
+    const bannerY = 48;
+
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+    ctx.fillRect(0, bannerY, w, bannerH);
+
+    // Pulsing opacity based on time
+    const pulse = 0.55 + Math.sin(time * 3.5) * 0.2;
+    const playerName = waitPlayer.name || 'Player';
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = '13px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif';
+    ctx.globalAlpha = pulse;
+    ctx.fillStyle = '#aaaaaa';
+    ctx.fillText(`Waiting for ${playerName}...`, w / 2, bannerY + bannerH / 2);
+    ctx.globalAlpha = 1;
   }
 }
 
@@ -864,8 +930,8 @@ function drawTitleScreen(ctx, game, viewport) {
 
   // Green course patch in center as decoration
   ctx.save();
-  ctx.translate(w / 2, h * 0.55);
-  const patchR = Math.min(w, h) * 0.22;
+  ctx.translate(w / 2, h * 0.44);
+  const patchR = Math.min(w, h) * 0.18;
   const courseGrad = ctx.createRadialGradient(0, 0, patchR * 0.2, 0, 0, patchR);
   courseGrad.addColorStop(0, '#3aad61');
   courseGrad.addColorStop(1, '#2d8a4e');
@@ -927,18 +993,9 @@ function drawTitleScreen(ctx, game, viewport) {
   ctx.fillText('MINI GOLF', w / 2, h * 0.28);
   ctx.shadowBlur = 0;
 
-  // Subtitle
-  ctx.font = `${Math.min(18, w / 22)}px -apple-system, system-ui, sans-serif`;
-  ctx.fillStyle = 'rgba(255,255,255,0.45)';
-  ctx.fillText('mccarrison.me/golf', w / 2, h * 0.28 + Math.min(72, w / 5) * 0.75);
+  // (subtitle removed)
 
-  // Pulsing "Tap to Play"
-  const pulse = 0.7 + 0.3 * Math.sin(time * 3);
-  ctx.globalAlpha = pulse;
-  ctx.font = `bold ${Math.min(22, w / 18)}px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif`;
-  ctx.fillStyle = '#4ecdc4';
-  ctx.fillText('Tap to Play', w / 2, h * 0.82);
-  ctx.globalAlpha = 1;
+  // Buttons are rendered via HTML overlay (#title-buttons)
 }
 
 // ---------------------------------------------------------------------------
@@ -971,18 +1028,55 @@ function drawGameOver(ctx, game, viewport) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 
-  // Trophy
-  ctx.font = `${Math.min(48, w / 8)}px serif`;
-  ctx.fillText('\u{1F3C6}', w / 2, cardY + 52);
+  const isSolo = game.mode === 'solo' || !game.players || game.players.length <= 1;
 
-  // FINAL SCORES
-  ctx.font = `bold ${Math.min(28, w / 16)}px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif`;
-  ctx.fillStyle = '#ffffff';
-  ctx.fillText('FINAL SCORES', w / 2, cardY + 100);
+  // Compute totals for solo rating
+  const totalPar0 = COURSES.reduce((s, c) => s + c.par, 0);
+  const soloScorecard = game.scorecard || [];
+  const soloTotal = soloScorecard.reduce((s, v) => s + (v || 0), 0);
+  const soloDiff = soloTotal - totalPar0;
 
-  // Winner determination
-  let winners = [];
-  if (game.players && game.players.length > 0) {
+  if (isSolo) {
+    // Solo: "GAME COMPLETE" header with rating
+    ctx.font = `${Math.min(48, w / 8)}px serif`;
+    ctx.fillText('\u26F3', w / 2, cardY + 52); // golf flag emoji
+
+    ctx.font = `bold ${Math.min(26, w / 16)}px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif`;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText('GAME COMPLETE', w / 2, cardY + 100);
+
+    // Score vs par
+    const diffLabel = soloDiff === 0 ? 'Even par' : (soloDiff < 0 ? `${Math.abs(soloDiff)} under par` : `${soloDiff} over par`);
+    let ratingText, ratingColor;
+    if (soloDiff < 0) {
+      ratingText = 'Under Par!';
+      ratingColor = '#4ecdc4';
+    } else if (soloDiff === 0) {
+      ratingText = 'Par';
+      ratingColor = '#ffffff';
+    } else {
+      ratingText = 'Over Par';
+      ratingColor = '#ff6b6b';
+    }
+
+    ctx.font = `bold ${Math.min(20, w / 20)}px -apple-system, system-ui, sans-serif`;
+    ctx.fillStyle = ratingColor;
+    ctx.fillText(ratingText, w / 2, cardY + 130);
+
+    ctx.font = `${Math.min(14, w / 26)}px -apple-system, system-ui, sans-serif`;
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.fillText(`${soloTotal} strokes - ${diffLabel}`, w / 2, cardY + 152);
+  } else {
+    // Multiplayer: trophy + "FINAL SCORES" + winner
+    ctx.font = `${Math.min(48, w / 8)}px serif`;
+    ctx.fillText('\u{1F3C6}', w / 2, cardY + 52);
+
+    ctx.font = `bold ${Math.min(28, w / 16)}px -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif`;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText('FINAL SCORES', w / 2, cardY + 100);
+
+    // Winner determination
+    let winners = [];
     let minScore = Infinity;
     for (const p of game.players) {
       const total = (p.scorecard || []).reduce((s, v) => s + (v || 0), 0);
@@ -992,13 +1086,13 @@ function drawGameOver(ctx, game, viewport) {
       const total = (p.scorecard || []).reduce((s, v) => s + (v || 0), 0);
       return total === minScore;
     });
-  }
 
-  if (winners.length > 0) {
-    const winnerName = winners.map(p => p.name || 'Player').join(' & ');
-    ctx.font = `${Math.min(16, w / 24)}px -apple-system, system-ui, sans-serif`;
-    ctx.fillStyle = '#f9d423';
-    ctx.fillText(`Winner: ${winnerName}`, w / 2, cardY + 130);
+    if (winners.length > 0) {
+      const winnerName = winners.map(p => p.name || 'Player').join(' & ');
+      ctx.font = `${Math.min(16, w / 24)}px -apple-system, system-ui, sans-serif`;
+      ctx.fillStyle = '#f9d423';
+      ctx.fillText(`Winner: ${winnerName}`, w / 2, cardY + 130);
+    }
   }
 
   // Scorecard table
@@ -1193,7 +1287,18 @@ export function render(ctx, game, viewport) {
   const currentHole = game.currentHole || 0;
   const strokes = game.strokes || 0;
   const ball = game.ball || null;
-  const balls = game.balls || [];
+  // game.balls is an object {playerId: {x,y,vx,vy}} in MP mode - convert to array for renderer
+  const ballsRaw = game.balls || {};
+  let balls;
+  if (Array.isArray(ballsRaw)) {
+    balls = ballsRaw;
+  } else {
+    // Convert object to array, attaching player color from game.players
+    balls = Object.entries(ballsRaw).map(([pid, b]) => {
+      const player = (game.players || []).find(p => String(p.id) === String(pid));
+      return { ...b, color: player ? player.color : '#4ecdc4', name: player ? player.name : '' };
+    }).filter(b => b.x !== undefined);
+  }
   const trail = game.trail || [];
   const input = game.input || {};
   const time = game.time || 0;
@@ -1309,8 +1414,9 @@ function drawCourseAndGame(ctx, game, viewport, currentHole, strokes, ball, ball
   // End course-space transform
   ctx.restore();
 
-  // 16-17. HUD (screen space)
+  // 16-18. HUD (screen space)
   drawTopBar(ctx, game, viewport);
+  drawMpTurnIndicator(ctx, game, viewport);
   drawScoreTicker(ctx, game, viewport);
 
   ctx.restore(); // screen shake
