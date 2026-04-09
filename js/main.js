@@ -65,13 +65,13 @@ function resetMpModal() {
   document.getElementById('mp-status').textContent = '\u00a0';
   document.getElementById('mp-code-display').textContent = '';
   document.getElementById('mp-roster').innerHTML = '';
-  document.getElementById('mp-roster-count').textContent = '0/8';
+  document.getElementById('mp-roster-count').textContent = '0';
 }
 
 function renderMpRoster(roster, myId) {
   const container = document.getElementById('mp-roster');
   const countEl = document.getElementById('mp-roster-count');
-  countEl.textContent = `${roster.length}/8`;
+  countEl.textContent = `${roster.length}`;
   container.innerHTML = '';
   for (const player of roster) {
     const row = document.createElement('div');

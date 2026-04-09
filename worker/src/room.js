@@ -21,8 +21,11 @@
 //   DO -> target: { type: 'kicked', reason }
 //   DO -> peers : { type: 'peerLeft', id, wasHost }  (on close)
 
-const MAX_CLIENTS = 8;
-const COLORS = ['#4ecdc4', '#ff6b6b', '#f9d423', '#a78bfa', '#f97316', '#06b6d4', '#ec4899', '#84cc16'];
+const COLORS = [
+  '#4ecdc4', '#ff6b6b', '#f9d423', '#a78bfa', '#f97316', '#06b6d4', '#ec4899', '#84cc16',
+  '#f43f5e', '#22d3ee', '#facc15', '#c084fc', '#fb923c', '#34d399', '#f472b6', '#a3e635',
+  '#e879f9', '#67e8f9', '#fbbf24', '#818cf8',
+];
 const IDLE_TTL_MS = 10 * 60 * 1000; // 10 min before first start
 const EMPTY_TTL_MS = 60 * 1000;     // 60s after empty
 
@@ -106,9 +109,6 @@ export class Room {
     await this._loadState();
 
     const existing = this.state.getWebSockets();
-    if (existing.length >= MAX_CLIENTS) {
-      return new Response('room full', { status: 409 });
-    }
 
     // Pick lowest unused color index
     const usedColors = new Set();
