@@ -2,6 +2,8 @@
  * game.js - Game state machine for Mini Golf
  *
  * Exports: createGame(), updateGame(game, rawInput, viewport, dt), getTotalScore(game), getTotalPar(game)
+ *          startMultiplayerGame(), applyShot(), applyBallUpdate(), applyTurnComplete(),
+ *          applyTurnStart(), applyHoleComplete(), applyGameOver()
  */
 
 import { COURSES } from './courses.js';
@@ -116,11 +118,33 @@ export function updateGame(game, rawInput, viewport, dt) {
       updateGameOver(game, rawInput);
       break;
 
+    case 'spectating':
+      updateSpectating(game, rawInput, dt);
+      break;
+
     default:
       break;
   }
 
   return game;
+}
+
+// ---------------------------------------------------------------------------
+// State: spectating (multiplayer - waiting for another player)
+// ---------------------------------------------------------------------------
+
+function updateSpectating(game, rawInput, dt) {
+  // Physics runs for remote ball updates but local input is disabled
+  // Just decay trail and shake for any actively displayed ball
+  game.animState.shakeMagnitude *= 0.9;
+
+  // Decay trail alphas for spectated ball
+  if (game.trail) {
+    for (let i = game.trail.length - 1; i >= 0; i--) {
+      game.trail[i].alpha -= 0.02;
+      if (game.trail[i].alpha < 0.05) game.trail.splice(i, 1);
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -301,4 +325,152 @@ export function getTotalPar(game) {
     }
   }
   return total;
+}
+
+// ---------------------------------------------------------------------------
+// Multiplayer game setup and event handlers
+// ---------------------------------------------------------------------------
+
+/**
+ * Initialize the game for multiplayer mode.
+ * @param {object} game
+ * @param {string[]} turnOrder - array of player IDs in turn order
+ * @param {string|number} myId - this client's player ID
+ * @param {object[]} players - array of {id, name, color}
+ */
+export function startMultiplayerGame(game, turnOrder, myId, players) {
+  game.mode = 'mp';
+  game.myId = myId;
+  game.turnOrder = turnOrder;
+  game.currentTurnPlayerId = turnOrder[0];
+  game.currentHole = 0;
+  game.strokes = 0;
+  game.scorecard = Array(9).fill(null);
+  game.trail = [];
+  game._trailStepCount = 0;
+
+  // Build players array with scorecards
+  game.players = players.map(p => ({
+    id: p.id,
+    name: p.name,
+    color: p.color,
+    scorecard: Array(9).fill(null),
+  }));
+
+  // Remote balls keyed by player ID (for spectating display)
+  game.balls = {};
+
+  placeBallAtTee(game, 0);
+
+  if (myId === turnOrder[0]) {
+    game.state = 'aiming';
+  } else {
+    game.state = 'spectating';
+  }
+}
+
+/**
+ * Apply a shot from a remote player (relay from DO).
+ */
+export function applyShot(game, playerId, angle, power) {
+  if (playerId === game.myId) return; // ignore echoed own shot
+  const curvedPower = power * power;
+  const actualPower = curvedPower * MAX_POWER;
+  // Create/update a remote ball entry for this player
+  const course = COURSES[game.currentHole];
+  if (!game.balls[playerId]) {
+    game.balls[playerId] = {
+      x: course ? course.tee.x : 0,
+      y: course ? course.tee.y : 0,
+      vx: 0,
+      vy: 0,
+    };
+  }
+  launchBall(game.balls[playerId], angle, actualPower);
+}
+
+/**
+ * Update a remote player's ball position for smooth spectating.
+ */
+export function applyBallUpdate(game, playerId, x, y, vx, vy) {
+  if (playerId === game.myId) return;
+  if (!game.balls[playerId]) game.balls[playerId] = { x, y, vx, vy };
+  else {
+    game.balls[playerId].x = x;
+    game.balls[playerId].y = y;
+    game.balls[playerId].vx = vx;
+    game.balls[playerId].vy = vy;
+  }
+}
+
+/**
+ * Record a remote player's hole completion.
+ */
+export function applyTurnComplete(game, playerId, strokes, sunk) {
+  if (playerId === game.myId) return;
+  const player = game.players.find(p => p.id === playerId);
+  if (player) {
+    player.scorecard[game.currentHole] = strokes;
+  }
+}
+
+/**
+ * Handle a turnStart event - enable input if it's my turn, else spectate.
+ * @param {boolean} isMyTurn - whether this is the local player's turn
+ */
+export function applyTurnStart(game, playerId, currentHole, isMyTurn) {
+  game.currentTurnPlayerId = playerId;
+  game.currentHole = currentHole;
+
+  if (isMyTurn) {
+    game.strokes = 0;
+    game.trail = [];
+    game._trailStepCount = 0;
+    placeBallAtTee(game, currentHole);
+    game.state = 'aiming';
+  } else {
+    game.state = 'spectating';
+    // Reset that player's remote ball to tee position
+    const course = COURSES[currentHole];
+    if (course && game.balls) {
+      game.balls[playerId] = {
+        x: course.tee.x,
+        y: course.tee.y,
+        vx: 0,
+        vy: 0,
+      };
+    }
+  }
+}
+
+/**
+ * Handle holeComplete - all players done, advance to next hole.
+ */
+export function applyHoleComplete(game, holeIndex, scores, nextHole) {
+  // Update all player scorecards from authoritative server scores
+  for (const player of game.players) {
+    if (scores[player.id] && scores[player.id][holeIndex] !== undefined) {
+      player.scorecard[holeIndex] = scores[player.id][holeIndex];
+    }
+  }
+  // Update local scorecard too
+  if (scores[game.myId] && scores[game.myId][holeIndex] !== undefined) {
+    game.scorecard[holeIndex] = scores[game.myId][holeIndex];
+  }
+  game.currentHole = nextHole;
+}
+
+/**
+ * Handle gameOver - set final scores and transition to gameover state.
+ */
+export function applyGameOver(game, finalScores) {
+  for (const player of game.players) {
+    if (finalScores[player.id]) {
+      player.scorecard = finalScores[player.id].slice();
+    }
+  }
+  if (finalScores[game.myId]) {
+    game.scorecard = finalScores[game.myId].slice();
+  }
+  game.state = 'gameover';
 }
