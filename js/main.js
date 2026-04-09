@@ -5,7 +5,7 @@ import { COURSES } from './courses.js';
 import { DT } from './physics.js';
 import { initInput, getInput, resetInput, setEnabled } from './input.js';
 import { render, worldToScreen, screenToWorld } from './render.js';
-import { createGame, updateGame, startMultiplayerGame, applyShot, applyBallUpdate, applyTurnComplete, applyTurnStart, applyHoleComplete, applyGameOver } from './game.js';
+import { createGame, updateGame, startMultiplayerGame, applyShot, applyBallUpdate, applyTurnComplete, applyTurnStart, applyHoleComplete, applyGameOver, addChatMessage } from './game.js';
 import { createSession } from './net.js';
 
 const canvas = document.getElementById('game');
@@ -148,6 +148,10 @@ function wireSession(sess) {
     }));
 
     startMultiplayerGame(game, data.turnOrder, sess.id, players, sess.code);
+
+    // Clear chat for new game
+    chatMessages.innerHTML = '';
+    game.chatMessages = [];
   });
 
   sess.on('turnStart', data => {
@@ -191,6 +195,15 @@ function wireSession(sess) {
 
   sess.on('error', () => {
     document.getElementById('mp-status').textContent = 'Connection error. Please try again.';
+  });
+
+  sess.on('chat', data => {
+    addChatMessage(game, data.id, data.name, data.text);
+    appendChatMessageToDOM(data.name, data.text, data.id);
+    // Flash unread indicator if chat is closed
+    if (!chatOpen) {
+      document.getElementById('chat-toggle').classList.add('has-unread');
+    }
   });
 }
 
@@ -265,6 +278,66 @@ document.getElementById('mp-cancel').addEventListener('click', () => {
 document.getElementById('mp-code-input').addEventListener('input', (e) => {
   e.target.value = e.target.value.toUpperCase();
 });
+
+// ---------------------------------------------------------------------------
+// Chat UI
+// ---------------------------------------------------------------------------
+
+const chatToggle = document.getElementById('chat-toggle');
+const chatPanel = document.getElementById('chat-panel');
+const chatInput = document.getElementById('chat-input');
+const chatSend = document.getElementById('chat-send');
+const chatMessages = document.getElementById('chat-messages');
+let chatOpen = false;
+
+chatToggle.addEventListener('click', () => {
+  chatOpen = !chatOpen;
+  chatPanel.classList.toggle('hidden', !chatOpen);
+  chatToggle.classList.remove('has-unread');
+  if (chatOpen) {
+    chatInput.focus();
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+  }
+});
+
+function sendChatMessage() {
+  const text = chatInput.value.trim();
+  if (!text || !session) return;
+  session.sendChat(text);
+  // Optimistic local echo
+  addChatMessage(game, session.id, game.playerName || 'You', text);
+  appendChatMessageToDOM(game.playerName || 'You', text, session.id);
+  chatInput.value = '';
+}
+
+chatSend.addEventListener('click', sendChatMessage);
+chatInput.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    sendChatMessage();
+  }
+  // Prevent game input while typing
+  e.stopPropagation();
+});
+
+function appendChatMessageToDOM(name, text, playerId) {
+  const div = document.createElement('div');
+  div.className = 'chat-msg';
+  const nameSpan = document.createElement('span');
+  nameSpan.className = 'chat-name';
+  // Find player color
+  const player = (game.players || []).find(p => p.id === playerId);
+  nameSpan.style.color = player ? player.color : '#4ecdc4';
+  nameSpan.textContent = name;
+  div.appendChild(nameSpan);
+  div.appendChild(document.createTextNode(text));
+  chatMessages.appendChild(div);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+  // Trim old DOM messages
+  while (chatMessages.children.length > 50) {
+    chatMessages.removeChild(chatMessages.firstChild);
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Viewport resize
@@ -390,6 +463,16 @@ function gameLoop(timestamp) {
   } else {
     hideTitleButtons();
     document.body.classList.add('game-active');
+  }
+
+  // Show chat toggle only in multiplayer during active game
+  const chatToggleEl = document.getElementById('chat-toggle');
+  if (game.mode === 'mp' && game.state !== 'title' && game.state !== 'gameover') {
+    chatToggleEl.classList.remove('hidden');
+  } else {
+    chatToggleEl.classList.add('hidden');
+    chatPanel.classList.add('hidden');
+    chatOpen = false;
   }
 
   // Render current frame

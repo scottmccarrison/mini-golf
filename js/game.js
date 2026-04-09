@@ -54,6 +54,8 @@ export function createGame() {
     playerName: '',
     titleStart: false,
     _trailStepCount: 0,
+    chatMessages: [],
+    chatOpen: false,
   };
 }
 
@@ -463,6 +465,15 @@ export function applyHoleComplete(game, holeIndex, scores, nextHole) {
     game.scorecard[holeIndex] = scores[game.myId][holeIndex];
   }
   game.currentHole = nextHole;
+}
+
+/**
+ * Add a chat message to the game state.
+ */
+export function addChatMessage(game, id, name, text) {
+  game.chatMessages.push({ id, name, text, time: game.time });
+  // Keep last 50 messages
+  if (game.chatMessages.length > 50) game.chatMessages.shift();
 }
 
 /**
