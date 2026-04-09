@@ -1,0 +1,46 @@
+# Dev worker for mini-golf. Completely isolated from prod.
+#
+# Deploy with:
+#   cd ~/mini-golf/worker
+#   npx wrangler deploy --config wrangler.dev.toml
+#
+# This worker is named golfdev-api and bound to mccarrison.me/golfdev*. It
+# uses its own Durable Object namespace (because the worker name is
+# different) and its own D1 database (minigolf-dev). Prod traffic at
+# mccarrison.me/golf never touches this worker.
+
+name = "golfdev-api"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
+
+routes = [
+  { pattern = "mccarrison.me/golfdev", zone_name = "mccarrison.me" },
+  { pattern = "mccarrison.me/golfdev/*", zone_name = "mccarrison.me" },
+]
+
+[vars]
+PATH_PREFIX = "/golfdev"
+
+# Static asset binding: serves the parent mini-golf directory at the
+# worker root. The bundle is whatever is checked out at deploy time.
+[assets]
+directory = "../"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+
+# Dev D1 - separate database from prod minigolf.
+[[d1_databases]]
+binding = "DB"
+database_name = "minigolf-dev"
+database_id = "placeholder-dev-db-id"
+
+# Durable Objects: same Room class, but because this worker has a
+# different name (golfdev-api), the namespace is fully separate from
+# the prod golf-api ROOMS namespace. Room codes do not collide.
+[[durable_objects.bindings]]
+name = "ROOMS"
+class_name = "Room"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Room"]

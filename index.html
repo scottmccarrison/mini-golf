@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#2d8a4e" />
+  <title>Mini Golf</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <div id="top-right">
+    <input id="name-input" type="text" maxlength="4" placeholder="name" autocomplete="off" />
+    <button id="mute-btn" type="button" title="mute / unmute">&#128266;</button>
+    <button id="help-btn" type="button" title="report a bug or suggestion">?</button>
+  </div>
+
+  <div id="feedback-modal" class="hidden" role="dialog" aria-modal="true">
+    <div class="fb-card">
+      <div class="fb-title">send feedback</div>
+      <textarea id="fb-text" maxlength="4000" rows="5" placeholder="bug? idea? what happened?"></textarea>
+      <div id="fb-status"></div>
+      <div class="fb-actions">
+        <button id="fb-cancel" type="button">cancel</button>
+        <button id="fb-send" type="button">send</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="mp-modal" class="hidden" role="dialog" aria-modal="true" aria-labelledby="mp-title">
+    <div class="fb-card mp-card">
+      <div class="fb-title" id="mp-title">Multiplayer</div>
+
+      <div id="mp-roster-wrap" class="hidden">
+        <div class="mp-roster-header">
+          <span id="mp-roster-count">0/8</span> players
+        </div>
+        <div id="mp-roster" class="mp-roster"></div>
+      </div>
+
+      <div id="mp-code-row" class="hidden">
+        <div class="mp-code">CODE: <span id="mp-code-display"></span></div>
+      </div>
+
+      <div id="mp-status">&nbsp;</div>
+      <button id="mp-ready" class="mp-btn hidden" disabled>I'm ready</button>
+
+      <div id="mp-pre-join">
+        <button id="mp-host" class="mp-btn">Host a game</button>
+        <div class="mp-divider">- or -</div>
+        <div class="mp-join-row">
+          <input id="mp-code-input" maxlength="4" placeholder="CODE" autocapitalize="characters" autocomplete="off" />
+          <button id="mp-join-go" class="mp-btn">Join</button>
+        </div>
+      </div>
+
+      <button id="mp-cancel" class="mp-btn mp-btn-secondary">Cancel</button>
+    </div>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
