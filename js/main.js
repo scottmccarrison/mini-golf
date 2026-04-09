@@ -39,7 +39,7 @@ const savedName = localStorage.getItem('golf-name') || '';
 nameInput.value = savedName;
 game.playerName = savedName;
 nameInput.addEventListener('input', () => {
-  const name = nameInput.value.slice(0, 4).toUpperCase();
+  const name = nameInput.value.slice(0, 10);
   nameInput.value = name;
   game.playerName = name;
   localStorage.setItem('golf-name', name);

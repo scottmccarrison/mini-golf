@@ -939,7 +939,7 @@ function drawMpBottomBar(ctx, game, viewport) {
   ctx.fillRect(0, barY, w, 1);
 
   // Layout: [name col] [hole 1] [hole 2] ... [hole 9] [TOT]
-  const nameColW = 56;
+  const nameColW = 80;
   const totColW = 30;
   const holeAreaW = w - nameColW - totColW;
   const holeColW = holeAreaW / 9;
@@ -978,7 +978,7 @@ function drawMpBottomBar(ctx, game, viewport) {
     ctx.fill();
 
     let name = player.name || `P${player.id}`;
-    if (name.length > 5) name = name.slice(0, 5);
+    if (name.length > 10) name = name.slice(0, 10);
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
     ctx.font = (isMe ? 'bold ' : '') + '10px -apple-system, system-ui, sans-serif';
