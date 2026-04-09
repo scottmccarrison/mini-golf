@@ -900,6 +900,80 @@ function drawMpTurnIndicator(ctx, game, viewport) {
 // ---------------------------------------------------------------------------
 
 function drawScoreTicker(ctx, game, viewport) {
+  const { w, h } = viewport;
+
+  if (game.mode === 'mp' && game.players && game.players.length > 0) {
+    drawMpBottomBar(ctx, game, viewport);
+  } else {
+    drawSoloBottomBar(ctx, game, viewport);
+  }
+}
+
+function drawMpBottomBar(ctx, game, viewport) {
+  const { w, h } = viewport;
+  const players = game.players;
+  const barH = 44;
+  const barY = h - barH;
+
+  // Background
+  ctx.fillStyle = 'rgba(0,0,0,0.45)';
+  ctx.fillRect(0, barY, w, barH);
+  ctx.fillStyle = 'rgba(255,255,255,0.07)';
+  ctx.fillRect(0, barY, w, 1);
+
+  const totalPar = COURSES.reduce((s, c) => s + c.par, 0);
+  const slotW = w / players.length;
+
+  for (let i = 0; i < players.length; i++) {
+    const player = players[i];
+    const isActive = player.id === game.currentTurnPlayerId;
+    const isMe = player.id === game.myId;
+    const slotX = i * slotW;
+    const centerX = slotX + slotW / 2;
+
+    // Active turn highlight
+    if (isActive) {
+      ctx.fillStyle = 'rgba(78,205,196,0.15)';
+      ctx.fillRect(slotX, barY + 1, slotW, barH - 2);
+      // Top accent line
+      ctx.fillStyle = '#4ecdc4';
+      ctx.fillRect(slotX + 4, barY + 1, slotW - 8, 2);
+    }
+
+    // Color dot
+    ctx.beginPath();
+    ctx.arc(centerX - 2, barY + 14, 5, 0, Math.PI * 2);
+    ctx.fillStyle = player.color || '#4ecdc4';
+    ctx.fill();
+
+    // Name
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = (isMe ? 'bold ' : '') + '11px -apple-system, system-ui, sans-serif';
+    ctx.fillStyle = isActive ? '#4ecdc4' : (isMe ? '#ffffff' : 'rgba(255,255,255,0.7)');
+    let name = player.name || `P${player.id}`;
+    if (name.length > 8) name = name.slice(0, 7) + '.';
+    ctx.fillText(name, centerX, barY + 14);
+
+    // Total score
+    let total = (player.scorecard || []).reduce((s, v) => s + (v !== null ? v : 0), 0);
+    if (isMe) total += (game.strokes || 0); // include current hole in-progress
+    const diff = total - totalPar;
+    const scoreStr = total > 0 ? String(total) : '-';
+
+    ctx.font = 'bold 13px -apple-system, system-ui, sans-serif';
+    ctx.fillStyle = isActive ? '#4ecdc4' : '#ffffff';
+    ctx.fillText(scoreStr, centerX, barY + 32);
+  }
+
+  // Dividers between slots
+  ctx.fillStyle = 'rgba(255,255,255,0.06)';
+  for (let i = 1; i < players.length; i++) {
+    ctx.fillRect(i * slotW, barY + 6, 1, barH - 12);
+  }
+}
+
+function drawSoloBottomBar(ctx, game, viewport) {
   const barH = 40;
   const { w, h } = viewport;
   const barY = h - barH;
@@ -907,8 +981,6 @@ function drawScoreTicker(ctx, game, viewport) {
   // Background
   ctx.fillStyle = 'rgba(0,0,0,0.4)';
   ctx.fillRect(0, barY, w, barH);
-
-  // Top border
   ctx.fillStyle = 'rgba(255,255,255,0.07)';
   ctx.fillRect(0, barY, w, 1);
 
@@ -916,19 +988,12 @@ function drawScoreTicker(ctx, game, viewport) {
   const currentHole = game.currentHole || 0;
   const scorecard = game.scorecard || [];
 
-  // Calculate total par
   let totalPar = 0;
-  for (const course of COURSES) {
-    totalPar += course.par;
-  }
-
-  // Calculate total score
+  for (const course of COURSES) totalPar += course.par;
   let totalScore = 0;
-  for (const s of scorecard) {
-    if (s !== null && s !== undefined) totalScore += s;
-  }
+  for (const s of scorecard) if (s !== null && s !== undefined) totalScore += s;
 
-  // Right side: total summary - measure it first to figure out available width
+  // Right: total summary
   const summaryText = `Total: ${totalScore}  (Par ${totalPar})`;
   ctx.font = 'bold 12px -apple-system, system-ui, sans-serif';
   const summaryW = ctx.measureText(summaryText).width + 24;
@@ -938,7 +1003,7 @@ function drawScoreTicker(ctx, game, viewport) {
   ctx.fillStyle = '#aaaaaa';
   ctx.fillText(summaryText, w - 16, barY + barH / 2);
 
-  // Hole numbers 1-9 across available width
+  // Hole numbers 1-9
   const availW = w - summaryW;
   const holeSlotW = availW / totalHoles;
 
@@ -946,18 +1011,14 @@ function drawScoreTicker(ctx, game, viewport) {
     const slotX = i * holeSlotW + holeSlotW / 2;
     const isCurrentHole = i === currentHole;
     const score = scorecard[i];
-    const course = COURSES[i];
-    const holePar = course ? course.par : 3;
+    const holePar = COURSES[i] ? COURSES[i].par : 3;
 
     ctx.textAlign = 'center';
-
-    // Hole number
     ctx.font = isCurrentHole
       ? 'bold 11px -apple-system, system-ui, sans-serif'
       : '10px -apple-system, system-ui, sans-serif';
 
     if (isCurrentHole) {
-      // Highlight background
       ctx.fillStyle = 'rgba(78,205,196,0.2)';
       ctx.fillRect(i * holeSlotW, barY + 1, holeSlotW, barH - 2);
       ctx.fillStyle = '#4ecdc4';
@@ -966,18 +1027,12 @@ function drawScoreTicker(ctx, game, viewport) {
     }
     ctx.fillText(String(i + 1), slotX, barY + 12);
 
-    // Score
     if (score !== null && score !== undefined) {
       const diff = score - holePar;
-      let scoreColor = '#ffffff'; // par
-      if (diff < 0) scoreColor = '#4ecdc4';   // under par
-      if (diff > 0) scoreColor = '#ff6b6b';   // over par
-
       ctx.font = 'bold 12px -apple-system, system-ui, sans-serif';
-      ctx.fillStyle = scoreColor;
+      ctx.fillStyle = diff < 0 ? '#4ecdc4' : diff > 0 ? '#ff6b6b' : '#ffffff';
       ctx.fillText(String(score), slotX, barY + 28);
     } else if (isCurrentHole) {
-      // Show current stroke in progress
       const strokes = game.strokes || 0;
       if (strokes > 0) {
         ctx.font = '11px -apple-system, system-ui, sans-serif';
@@ -1492,7 +1547,6 @@ function drawCourseAndGame(ctx, game, viewport, currentHole, strokes, ball, ball
   // 16-19. HUD (screen space)
   drawTopBar(ctx, game, viewport);
   drawMpTurnIndicator(ctx, game, viewport);
-  drawPlayerList(ctx, game, viewport);
   drawScoreTicker(ctx, game, viewport);
 
   ctx.restore(); // screen shake
