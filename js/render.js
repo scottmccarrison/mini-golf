@@ -12,13 +12,19 @@ import { BALL_RADIUS, HOLE_RADIUS } from './physics.js';
  * Compute the course-to-screen transform parameters.
  * Returns { scale, offsetX, offsetY }
  */
-function getCourseTransform(course, viewport) {
-  const padding = 60;
-  const scaleX = (viewport.w - padding * 2) / course.bounds.width;
-  const scaleY = (viewport.h - padding * 2) / course.bounds.height;
-  const scale = Math.min(scaleX, scaleY);
-  const offsetX = (viewport.w - course.bounds.width * scale) / 2;
-  const offsetY = (viewport.h - course.bounds.height * scale) / 2;
+function getCourseTransform(course, viewport, zoom) {
+  const sidePad = 12;
+  const topPad = 54;   // HUD top bar (48px) + margin
+  const botPad = 46;   // HUD score ticker (40px) + margin
+  const availW = viewport.w - sidePad * 2;
+  const availH = viewport.h - topPad - botPad;
+  const scaleX = availW / course.bounds.width;
+  const scaleY = availH / course.bounds.height;
+  const baseScale = Math.min(scaleX, scaleY);
+  const z = zoom || { level: 1, panX: 0, panY: 0 };
+  const scale = baseScale * z.level;
+  const offsetX = sidePad + (availW - course.bounds.width * scale) / 2 + z.panX;
+  const offsetY = topPad + (availH - course.bounds.height * scale) / 2 + z.panY;
   return { scale, offsetX, offsetY };
 }
 
@@ -27,7 +33,7 @@ function getCourseTransform(course, viewport) {
  */
 export function worldToScreen(wx, wy, game, viewport) {
   const course = COURSES[game.currentHole || 0];
-  const { scale, offsetX, offsetY } = getCourseTransform(course, viewport);
+  const { scale, offsetX, offsetY } = getCourseTransform(course, viewport, game.zoom);
   return {
     x: wx * scale + offsetX,
     y: wy * scale + offsetY,
@@ -39,7 +45,7 @@ export function worldToScreen(wx, wy, game, viewport) {
  */
 export function screenToWorld(sx, sy, game, viewport) {
   const course = COURSES[game.currentHole || 0];
-  const { scale, offsetX, offsetY } = getCourseTransform(course, viewport);
+  const { scale, offsetX, offsetY } = getCourseTransform(course, viewport, game.zoom);
   return {
     x: (sx - offsetX) / scale,
     y: (sy - offsetY) / scale,
@@ -1236,7 +1242,7 @@ function drawCourseAndGame(ctx, game, viewport, currentHole, strokes, ball, ball
   const course = COURSES[currentHole];
   if (!course) return;
 
-  const { scale, offsetX, offsetY } = getCourseTransform(course, viewport);
+  const { scale, offsetX, offsetY } = getCourseTransform(course, viewport, game.zoom);
 
   // Apply screen shake in screen space
   ctx.save();
