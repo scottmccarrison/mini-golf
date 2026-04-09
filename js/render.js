@@ -864,8 +864,8 @@ function drawTitleScreen(ctx, game, viewport) {
 
   // Green course patch in center as decoration
   ctx.save();
-  ctx.translate(w / 2, h * 0.55);
-  const patchR = Math.min(w, h) * 0.22;
+  ctx.translate(w / 2, h * 0.44);
+  const patchR = Math.min(w, h) * 0.18;
   const courseGrad = ctx.createRadialGradient(0, 0, patchR * 0.2, 0, 0, patchR);
   courseGrad.addColorStop(0, '#3aad61');
   courseGrad.addColorStop(1, '#2d8a4e');
