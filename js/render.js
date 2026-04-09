@@ -940,27 +940,35 @@ function drawMpBottomBar(ctx, game, viewport) {
       ctx.fillRect(slotX + 4, barY + 1, slotW - 8, 2);
     }
 
-    // Color dot
-    ctx.beginPath();
-    ctx.arc(centerX - 2, barY + 14, 5, 0, Math.PI * 2);
-    ctx.fillStyle = player.color || '#4ecdc4';
-    ctx.fill();
-
-    // Name
-    ctx.textAlign = 'center';
+    // Name row: dot + name, centered together
     ctx.textBaseline = 'middle';
     ctx.font = (isMe ? 'bold ' : '') + '11px -apple-system, system-ui, sans-serif';
     ctx.fillStyle = isActive ? '#4ecdc4' : (isMe ? '#ffffff' : 'rgba(255,255,255,0.7)');
     let name = player.name || `P${player.id}`;
     if (name.length > 8) name = name.slice(0, 7) + '.';
-    ctx.fillText(name, centerX, barY + 14);
+    const nameW = ctx.measureText(name).width;
+    const dotR = 4;
+    const gap = 5;
+    const totalW = dotR * 2 + gap + nameW;
+    const startX = centerX - totalW / 2;
 
-    // Total score
+    // Color dot
+    ctx.beginPath();
+    ctx.arc(startX + dotR, barY + 15, dotR, 0, Math.PI * 2);
+    ctx.fillStyle = player.color || '#4ecdc4';
+    ctx.fill();
+
+    // Name
+    ctx.textAlign = 'left';
+    ctx.fillStyle = isActive ? '#4ecdc4' : (isMe ? '#ffffff' : 'rgba(255,255,255,0.7)');
+    ctx.fillText(name, startX + dotR * 2 + gap, barY + 15);
+
+    // Total score below
     let total = (player.scorecard || []).reduce((s, v) => s + (v !== null ? v : 0), 0);
-    if (isMe) total += (game.strokes || 0); // include current hole in-progress
-    const diff = total - totalPar;
+    if (isMe) total += (game.strokes || 0);
     const scoreStr = total > 0 ? String(total) : '-';
 
+    ctx.textAlign = 'center';
     ctx.font = 'bold 13px -apple-system, system-ui, sans-serif';
     ctx.fillStyle = isActive ? '#4ecdc4' : '#ffffff';
     ctx.fillText(scoreStr, centerX, barY + 32);
