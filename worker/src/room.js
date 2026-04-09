@@ -294,6 +294,19 @@ export class Room {
         break;
       }
 
+      case 'chat': {
+        if (typeof data.text !== 'string') break;
+        const text = data.text.trim().slice(0, 200);
+        if (!text) break;
+        // Rate limit: 1 message per second per client
+        const now = Date.now();
+        if (meta.lastChatAt && now - meta.lastChatAt < 1000) break;
+        meta.lastChatAt = now;
+        ws.serializeAttachment(meta);
+        this._broadcast({ type: 'chat', id: meta.id, name: meta.name, text });
+        break;
+      }
+
       case 'kick': {
         if (!meta.isHost) break;
         const targetId = data.targetId;
