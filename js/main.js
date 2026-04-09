@@ -306,6 +306,75 @@ document.getElementById('mp-code-input').addEventListener('input', (e) => {
 });
 
 // ---------------------------------------------------------------------------
+// Leaderboard modal
+// ---------------------------------------------------------------------------
+
+const lbModal = document.getElementById('lb-modal');
+const lbList = document.getElementById('lb-list');
+let lbActiveTab = 'daily';
+
+document.getElementById('btn-lb').addEventListener('click', () => {
+  hideTitleButtons();
+  lbModal.classList.remove('hidden');
+  refreshLbModal();
+});
+
+document.getElementById('lb-close').addEventListener('click', () => {
+  lbModal.classList.add('hidden');
+  showTitleButtons();
+});
+
+// Tab switching
+for (const tab of document.querySelectorAll('.lb-tab')) {
+  tab.addEventListener('click', () => {
+    lbActiveTab = tab.dataset.tab;
+    for (const t of document.querySelectorAll('.lb-tab')) t.classList.remove('active');
+    tab.classList.add('active');
+    renderLbList();
+  });
+}
+
+function refreshLbModal() {
+  // Re-fetch leaderboard when opening
+  fetchLeaderboard().then(board => {
+    if (board) game._leaderboard = board;
+    game._personalBests = getPersonalBests();
+    renderLbList();
+  });
+  renderLbList(); // show cached data immediately
+}
+
+function renderLbList() {
+  const board = game._leaderboard;
+  let entries = [];
+
+  if (lbActiveTab === 'daily') {
+    entries = board ? board.daily : [];
+  } else if (lbActiveTab === 'alltime') {
+    entries = board ? board.alltime : [];
+  } else {
+    entries = (game._personalBests || []).map(e => ({ name: game.playerName || 'You', score: e.score }));
+  }
+
+  if (!entries || entries.length === 0) {
+    lbList.innerHTML = '<div class="lb-empty">No scores yet</div>';
+    return;
+  }
+
+  lbList.innerHTML = entries.slice(0, 10).map((e, i) => `
+    <div class="lb-row">
+      <span class="lb-rank">${i + 1}.</span>
+      <span class="lb-row-name">${escapeHtml(e.name || 'anon')}</span>
+      <span class="lb-row-score">${e.score}</span>
+    </div>
+  `).join('');
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// ---------------------------------------------------------------------------
 // Chat UI
 // ---------------------------------------------------------------------------
 

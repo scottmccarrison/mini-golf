@@ -436,6 +436,134 @@ html, body {
   background: rgba(249, 212, 35, 0.25);
 }
 
+.title-btn-tertiary {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 14px;
+  padding: 10px 0;
+}
+.title-btn-tertiary:hover, .title-btn-tertiary:active {
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* Leaderboard modal */
+#lb-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+#lb-modal.hidden { display: none; }
+
+.lb-card {
+  background: rgba(20, 25, 50, 0.95);
+  border: 1px solid rgba(78, 205, 196, 0.25);
+  color: #fff;
+  border-radius: 12px;
+  padding: 18px;
+  width: 100%;
+  max-width: 360px;
+  max-height: 80vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.lb-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.lb-tab {
+  flex: 1;
+  padding: 10px 0;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: rgba(255, 255, 255, 0.45);
+  font: 13px -apple-system, system-ui, sans-serif;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: color 0.15s;
+}
+
+.lb-tab.active {
+  color: #4ecdc4;
+  border-bottom-color: #4ecdc4;
+  font-weight: 700;
+}
+
+.lb-tab:hover:not(.active) {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.lb-list {
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.lb-row {
+  display: flex;
+  align-items: center;
+  padding: 8px 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  font-size: 14px;
+}
+
+.lb-row:first-child {
+  background: rgba(249, 212, 35, 0.08);
+}
+
+.lb-rank {
+  width: 24px;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 12px;
+}
+
+.lb-row:first-child .lb-rank {
+  color: #f9d423;
+}
+
+.lb-row-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.lb-row:first-child .lb-row-name {
+  color: #f9d423;
+  font-weight: 700;
+}
+
+.lb-row-score {
+  font-weight: 700;
+  color: #fff;
+  margin-left: 12px;
+}
+
+.lb-row:first-child .lb-row-score {
+  color: #f9d423;
+}
+
+.lb-empty {
+  text-align: center;
+  padding: 24px 0;
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 13px;
+}
+
 /* Multiplayer open button */
 #mp-open-btn {
   width: 32px;
