@@ -375,6 +375,22 @@ function escapeHtml(s) {
 }
 
 // ---------------------------------------------------------------------------
+// How to Play modal
+// ---------------------------------------------------------------------------
+
+const htpModal = document.getElementById('htp-modal');
+
+document.getElementById('btn-htp').addEventListener('click', () => {
+  hideTitleButtons();
+  htpModal.classList.remove('hidden');
+});
+
+document.getElementById('htp-close').addEventListener('click', () => {
+  htpModal.classList.add('hidden');
+  showTitleButtons();
+});
+
+// ---------------------------------------------------------------------------
 // Chat UI
 // ---------------------------------------------------------------------------
 

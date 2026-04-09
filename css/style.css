@@ -582,6 +582,61 @@ html, body {
   color: #fff;
 }
 
+/* How to Play modal */
+#htp-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+#htp-modal.hidden { display: none; }
+
+.htp-card {
+  background: rgba(20, 25, 50, 0.95);
+  border: 1px solid rgba(78, 205, 196, 0.25);
+  color: #fff;
+  border-radius: 12px;
+  padding: 18px;
+  width: 100%;
+  max-width: 360px;
+  max-height: 80vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.htp-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #4ecdc4;
+  text-align: center;
+}
+
+.htp-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.htp-heading {
+  font-size: 14px;
+  font-weight: 700;
+  color: #f9d423;
+  margin-bottom: 4px;
+}
+
+.htp-section p {
+  font-size: 13px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.75);
+  margin: 0;
+}
+
 /* Multiplayer open button */
 #mp-open-btn {
   width: 32px;
