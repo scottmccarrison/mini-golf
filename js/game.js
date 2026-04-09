@@ -242,7 +242,14 @@ function updateSunk(game, dt) {
   if (game.animState.sinkTimer >= 1) {
     game.scorecard[game.currentHole] = game.strokes;
 
-    if (game.currentHole < 8) {
+    if (game.mode === 'mp') {
+      // In MP, hide the ball and wait for other players to finish the hole
+      game.ball.x = -999;
+      game.ball.y = -999;
+      game.ball.vx = 0;
+      game.ball.vy = 0;
+      game.state = 'spectating';
+    } else if (game.currentHole < 8) {
       game.state = 'nextHole';
       game.animState.holeTransition = 0;
       game.animState.holeTransitionPhase = 'out';
