@@ -383,10 +383,13 @@ function gameLoop(timestamp) {
   // Sync title button visibility
   if (game.state === 'title') {
     showTitleButtons();
+    document.body.classList.remove('game-active');
   } else if (game.state === 'gameover' && game.mode === 'solo') {
     showTitleButtons();
+    document.body.classList.remove('game-active');
   } else {
     hideTitleButtons();
+    document.body.classList.add('game-active');
   }
 
   // Render current frame
