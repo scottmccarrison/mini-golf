@@ -72,31 +72,45 @@ function tracePolygon(ctx, points) {
 function drawCourseFloor(ctx, course) {
   if (!course.walls || course.walls.length === 0) return;
 
-  // Build a rough bounding polygon from the wall segments
-  // Collect unique points to form an approximate playable outline
-  const pts = [];
-  for (const w of course.walls) {
-    pts.push({ x: w.x1, y: w.y1 });
-    pts.push({ x: w.x2, y: w.y2 });
+  // Trace the outer boundary: follow connected wall segments starting from wall[0].
+  // Stop when we loop back to the start point or run out of connected walls.
+  // This skips internal walls (islands, chicanes) that aren't part of the outer perimeter.
+  const outerPts = [];
+  const walls = course.walls;
+  const used = new Set();
+
+  // Start with the first wall
+  outerPts.push({ x: walls[0].x1, y: walls[0].y1 });
+  outerPts.push({ x: walls[0].x2, y: walls[0].y2 });
+  used.add(0);
+
+  // Follow the chain: find the next wall whose start matches our current end
+  let current = { x: walls[0].x2, y: walls[0].y2 };
+  const start = { x: walls[0].x1, y: walls[0].y1 };
+  const eps = 2;
+
+  for (let iter = 0; iter < walls.length; iter++) {
+    let found = false;
+    for (let i = 0; i < walls.length; i++) {
+      if (used.has(i)) continue;
+      if (Math.abs(walls[i].x1 - current.x) < eps && Math.abs(walls[i].y1 - current.y) < eps) {
+        outerPts.push({ x: walls[i].x2, y: walls[i].y2 });
+        current = { x: walls[i].x2, y: walls[i].y2 };
+        used.add(i);
+        found = true;
+        break;
+      }
+    }
+    if (!found) break;
+    // Check if we've looped back to start
+    if (Math.abs(current.x - start.x) < eps && Math.abs(current.y - start.y) < eps) break;
   }
 
-  // Use a convex-hull-like ordered path: sort by angle from centroid
-  const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
-  const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
-  pts.sort((a, b) => Math.atan2(a.y - cy, a.x - cx) - Math.atan2(b.y - cy, b.x - cx));
-
-  // Build a connected path from wall segments preserving order
-  // Use the raw wall sequence instead - create a polygon by tracing walls in order
-  const wallPts = [];
-  for (const w of course.walls) {
-    wallPts.push({ x: w.x1, y: w.y1 });
-  }
-
-  // Fill main floor
+  // Fill the outer boundary
   ctx.beginPath();
-  ctx.moveTo(wallPts[0].x, wallPts[0].y);
-  for (let i = 1; i < wallPts.length; i++) {
-    ctx.lineTo(wallPts[i].x, wallPts[i].y);
+  ctx.moveTo(outerPts[0].x, outerPts[0].y);
+  for (let i = 1; i < outerPts.length; i++) {
+    ctx.lineTo(outerPts[i].x, outerPts[i].y);
   }
   ctx.closePath();
 
