@@ -1369,11 +1369,72 @@ function drawGameOver(ctx, game, viewport) {
     ctx.fillText(String(playerTotal), cardX + 20 + colW * 9 + colW / 2, tableY + rowH * (pi + 2) + rowH / 2);
   }
 
+  // Leaderboard section
+  let lbY = tableY + rowH * (players.length + 3);
+  const board = game._leaderboard;
+  if (board) {
+    const lbX = cardX + 16;
+    const lbW = cardW - 32;
+
+    // Tabs: Daily | All-Time | Personal
+    const tabs = ['Daily', 'All-Time', 'Personal'];
+    const activeTab = game._lbTab || 0;
+    const tabW = lbW / tabs.length;
+
+    for (let i = 0; i < tabs.length; i++) {
+      const tx = lbX + i * tabW;
+      const isActive = i === activeTab;
+      ctx.fillStyle = isActive ? 'rgba(78,205,196,0.15)' : 'transparent';
+      ctx.fillRect(tx, lbY, tabW, 22);
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = (isActive ? 'bold ' : '') + '11px -apple-system, system-ui, sans-serif';
+      ctx.fillStyle = isActive ? '#4ecdc4' : 'rgba(255,255,255,0.45)';
+      ctx.fillText(tabs[i], tx + tabW / 2, lbY + 11);
+    }
+    // Underline active tab
+    ctx.fillStyle = '#4ecdc4';
+    ctx.fillRect(lbX + activeTab * tabW + 4, lbY + 22, tabW - 8, 2);
+
+    lbY += 30;
+
+    // Get the right data
+    let entries = [];
+    if (activeTab === 0) entries = board.daily || [];
+    else if (activeTab === 1) entries = board.alltime || [];
+    else entries = (game._personalBests || []).map(e => ({ name: 'You', score: e.score }));
+
+    if (entries.length === 0) {
+      ctx.textAlign = 'center';
+      ctx.font = '12px -apple-system, system-ui, sans-serif';
+      ctx.fillStyle = 'rgba(255,255,255,0.35)';
+      ctx.fillText('No scores yet', w / 2, lbY + 16);
+      lbY += 36;
+    } else {
+      for (let i = 0; i < Math.min(entries.length, 5); i++) {
+        const entry = entries[i];
+        const ey = lbY + i * 20;
+
+        ctx.textAlign = 'left';
+        ctx.font = '11px -apple-system, system-ui, sans-serif';
+        ctx.fillStyle = i === 0 ? '#f9d423' : 'rgba(255,255,255,0.7)';
+        ctx.fillText(`${i + 1}.`, lbX + 4, ey + 10);
+        ctx.fillText(entry.name || 'anon', lbX + 22, ey + 10);
+
+        ctx.textAlign = 'right';
+        ctx.font = 'bold 11px -apple-system, system-ui, sans-serif';
+        ctx.fillStyle = i === 0 ? '#f9d423' : '#ffffff';
+        ctx.fillText(String(entry.score), lbX + lbW - 4, ey + 10);
+      }
+      lbY += Math.min(entries.length, 5) * 20 + 8;
+    }
+  }
+
   // Play Again button area
   const btnW = 160;
   const btnH = 44;
   const btnX = w / 2 - btnW / 2;
-  const btnY = tableY + rowH * (players.length + 3);
+  const btnY = lbY + 8;
 
   ctx.beginPath();
   ctx.roundRect(btnX, btnY, btnW, btnH, 8);

@@ -7,6 +7,7 @@ import { initInput, getInput, resetInput, setEnabled } from './input.js';
 import { render, worldToScreen, screenToWorld } from './render.js';
 import { createGame, updateGame, startMultiplayerGame, applyShot, applyBallUpdate, applyTurnComplete, applyTurnStart, applyHoleComplete, applyGameOver, addChatMessage } from './game.js';
 import { createSession } from './net.js';
+import { fetchLeaderboard, submitScore, recordPersonalBest, getPersonalBests } from './leaderboard.js';
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -29,6 +30,15 @@ window._dbg = {
 };
 let lastTime = 0;
 let accumulator = 0;
+
+// ---------------------------------------------------------------------------
+// Leaderboard - fetch on load
+// ---------------------------------------------------------------------------
+
+fetchLeaderboard().then(board => {
+  if (board) game._leaderboard = board;
+});
+game._personalBests = getPersonalBests();
 
 // ---------------------------------------------------------------------------
 // Player name persistence
@@ -479,6 +489,20 @@ function gameLoop(timestamp) {
   } else {
     hideTitleButtons();
     document.body.classList.add('game-active');
+  }
+
+  // Auto-submit score on game over (solo only, once)
+  if (game.state === 'gameover' && !game._scoreSubmitted) {
+    game._scoreSubmitted = true;
+    const totalScore = game.scorecard.reduce((s, v) => s + (v || 0), 0);
+    const totalPar = COURSES.reduce((s, c) => s + c.par, 0);
+    const name = game.playerName || 'anon';
+    if (totalScore > 0) {
+      recordPersonalBest(totalScore);
+      submitScore(name, totalScore, totalPar).then(board => {
+        if (board) game._leaderboard = board;
+      });
+    }
   }
 
   // Show chat toggle only in multiplayer during active game

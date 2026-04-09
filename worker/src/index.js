@@ -1,42 +1,45 @@
 // golf-api worker (also used by golfdev-api via wrangler.dev.toml).
 // Path prefix is read from env.PATH_PREFIX (defaults to "/golf") so the same
 // code can serve mccarrison.me/golf (prod) and mccarrison.me/golfdev (dev).
-// Routes (relative to the prefix):
-//   POST /api/room             -> create room, returns { code }
-//   GET  /api/room/{CODE}      -> WebSocket upgrade to Room DO
-//   GET  /api/leaderboard      -> top 10 scores (placeholder)
-//   POST /api/score            -> submit score (placeholder)
-//   POST /api/feedback         -> submit feedback (placeholder)
-//   *                          -> serves static assets from ../
 
 export { Room } from './room.js';
+
+const MAX_NAME_LEN = 16;
+const MAX_SCORE = 200; // 9 holes, even terrible play shouldn't exceed this
 
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const prefix = (env.PATH_PREFIX || '/golf');
 
-    // Redirect bare prefix to prefix + '/' so relative asset paths resolve.
     if (url.pathname === prefix) {
       return Response.redirect(url.origin + prefix + '/', 301);
     }
 
-    // Strip the configured prefix when bound to mccarrison.me/<prefix>/*
     let path = url.pathname;
     if (path.startsWith(prefix + '/')) path = path.slice(prefix.length) || '/';
 
+    // --- Leaderboard v2: daily + alltime + top ever ---
+    if (path === '/api/leaderboard/v2' && request.method === 'GET') {
+      return getLeaderboardV2(env);
+    }
+
+    // --- Leaderboard v1 (simple) ---
     if (path === '/api/leaderboard' && request.method === 'GET') {
-      return json({ scores: [] });
+      return getLeaderboard(env);
     }
 
+    // --- Submit score ---
     if (path === '/api/score' && request.method === 'POST') {
-      return json({ ok: true });
+      return postScore(request, env);
     }
 
+    // --- Feedback ---
     if (path === '/api/feedback' && request.method === 'POST') {
       return json({ ok: true });
     }
 
+    // --- Room create ---
     if (path === '/api/room' && request.method === 'POST') {
       const code = generateRoomCode();
       const id = env.ROOMS.idFromName(code);
@@ -49,6 +52,7 @@ export default {
       return json({ code });
     }
 
+    // --- Room WebSocket ---
     const roomMatch = path.match(/^\/api\/room\/([A-Z]{4})$/);
     if (roomMatch && request.headers.get('Upgrade') === 'websocket') {
       const code = roomMatch[1];
@@ -57,14 +61,73 @@ export default {
       return stub.fetch(request);
     }
 
-    // Static assets - rewrite the request URL so the asset bundle (which
-    // has files at /js/main.js, /css/style.css, etc.) is asked for the
-    // stripped path, not the /golf-prefixed one.
+    // --- Static assets ---
     const assetUrl = new URL(request.url);
     assetUrl.pathname = path;
     return env.ASSETS.fetch(new Request(assetUrl.toString(), request));
   },
 };
+
+// ---------------------------------------------------------------------------
+// Leaderboard helpers
+// ---------------------------------------------------------------------------
+
+async function getLeaderboard(env) {
+  const { results } = await env.DB.prepare(
+    `SELECT name, score, created_at FROM scores ORDER BY score ASC LIMIT 10`
+  ).all();
+  return json({ scores: results || [] });
+}
+
+async function getLeaderboardV2(env) {
+  const now = new Date();
+  const utcMidnight = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const nextResetMs = utcMidnight + 24 * 60 * 60 * 1000;
+
+  const [dailyRes, allRes, topRes] = await Promise.all([
+    env.DB.prepare(
+      `SELECT name, score, created_at FROM scores
+       WHERE created_at >= ? ORDER BY score ASC LIMIT 10`
+    ).bind(utcMidnight).all(),
+    env.DB.prepare(
+      `SELECT name, score, created_at FROM scores ORDER BY score ASC LIMIT 10`
+    ).all(),
+    env.DB.prepare(
+      `SELECT name, score, created_at FROM scores ORDER BY score ASC LIMIT 1`
+    ).all(),
+  ]);
+
+  return json({
+    daily: dailyRes.results || [],
+    alltime: allRes.results || [],
+    topEver: (topRes.results && topRes.results[0]) || null,
+    resetsAt: nextResetMs,
+    serverNow: Date.now(),
+  });
+}
+
+async function postScore(request, env) {
+  let body;
+  try { body = await request.json(); } catch { return json({ error: 'invalid json' }, 400); }
+
+  const name = String(body.name ?? '').trim().slice(0, MAX_NAME_LEN) || 'anon';
+  const score = Math.floor(Number(body.score));
+  if (!Number.isFinite(score) || score < 1 || score > MAX_SCORE) {
+    return json({ error: 'invalid score' }, 400);
+  }
+
+  const coursePar = Math.floor(Number(body.coursePar)) || 30;
+
+  await env.DB.prepare(
+    `INSERT INTO scores (name, score, course_par, created_at) VALUES (?, ?, ?, ?)`
+  ).bind(name, score, coursePar, Date.now()).run();
+
+  return getLeaderboardV2(env);
+}
+
+// ---------------------------------------------------------------------------
+// Utilities
+// ---------------------------------------------------------------------------
 
 function generateRoomCode() {
   const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
