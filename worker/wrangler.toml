@@ -1,0 +1,32 @@
+name = "golf-api"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
+
+routes = [
+  { pattern = "mccarrison.me/golf", zone_name = "mccarrison.me" },
+  { pattern = "mccarrison.me/golf/*", zone_name = "mccarrison.me" },
+]
+
+[vars]
+PATH_PREFIX = "/golf"
+
+# Static asset binding: serves the parent mini-golf directory at the
+# worker root, while the worker code itself handles /api/*.
+[assets]
+directory = "../"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+
+# D1 database for the leaderboard.
+[[d1_databases]]
+binding = "DB"
+database_name = "minigolf"
+database_id = "placeholder-db-id"
+
+[[durable_objects.bindings]]
+name = "ROOMS"
+class_name = "Room"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Room"]
