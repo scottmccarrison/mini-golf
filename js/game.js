@@ -427,25 +427,32 @@ export function applyTurnComplete(game, playerId, strokes, sunk) {
  */
 export function applyTurnStart(game, playerId, currentHole, isMyTurn) {
   game.currentTurnPlayerId = playerId;
+  const holeChanged = game.currentHole !== currentHole;
   game.currentHole = currentHole;
 
   if (isMyTurn) {
-    game.strokes = 0;
-    game.trail = [];
-    game._trailStepCount = 0;
-    placeBallAtTee(game, currentHole);
+    if (holeChanged) {
+      // New hole: reset everything
+      game.strokes = 0;
+      game.trail = [];
+      game._trailStepCount = 0;
+      placeBallAtTee(game, currentHole);
+    }
+    // Same hole: keep strokes and ball position (continuing after other player's turn)
     game.state = 'aiming';
   } else {
     game.state = 'spectating';
-    // Reset that player's remote ball to tee position
-    const course = COURSES[currentHole];
-    if (course && game.balls) {
-      game.balls[playerId] = {
-        x: course.tee.x,
-        y: course.tee.y,
-        vx: 0,
-        vy: 0,
-      };
+    if (holeChanged) {
+      // New hole: reset remote ball to tee
+      const course = COURSES[currentHole];
+      if (course && game.balls) {
+        game.balls[playerId] = {
+          x: course.tee.x,
+          y: course.tee.y,
+          vx: 0,
+          vy: 0,
+        };
+      }
     }
   }
 }

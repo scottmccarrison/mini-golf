@@ -221,15 +221,17 @@ export class Room {
         const sunk = !!data.sunk;
         const strokes = Math.max(1, Math.round(data.strokes));
 
-        // Record score for this player on the current hole
-        if (!this._scores[meta.id]) this._scores[meta.id] = [];
-        this._scores[meta.id][this._currentHole] = strokes;
-
-        // Mark this player as done for the hole
-        this._holeDone.add(meta.id);
-
         // Relay to all clients
         this._broadcast({ type: 'turnComplete', id: meta.id, strokes, sunk });
+
+        if (sunk) {
+          // Ball sunk - record final score and mark player as done for this hole
+          if (!this._scores[meta.id]) this._scores[meta.id] = [];
+          this._scores[meta.id][this._currentHole] = strokes;
+          this._holeDone.add(meta.id);
+        }
+        // If not sunk, ball just stopped - player keeps their stroke count
+        // and will get another turn on this hole
 
         // Find all connected player IDs
         const connectedIds = this._getConnectedIds();
