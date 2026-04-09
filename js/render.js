@@ -730,39 +730,114 @@ function drawTopBar(ctx, game, viewport) {
   ctx.fillStyle = '#4ecdc4';
   ctx.fillText(`STROKE ${strokes}`, w / 2, midY);
 
-  // Right: player info
+  // Right: room code only (multiplayer) or player name (solo)
   ctx.textAlign = 'right';
-  let rightX = w - 16;
+  const rightX = w - 16;
 
-  // Multiplayer room code
   if (game.mode === 'mp' && game.roomCode) {
-    ctx.font = '11px -apple-system, system-ui, sans-serif';
+    // Show room code small on far right - no player name (player list panel shows that)
+    ctx.font = '12px -apple-system, system-ui, monospace';
     ctx.fillStyle = '#888888';
-    ctx.fillText(`#${game.roomCode}`, rightX, midY + 9);
-    rightX -= 8;
-  }
-
-  // Current turn player
-  if (game.players && game.players.length > 0) {
-    const turnPlayer = game.players.find(p => p.id === game.currentTurnPlayerId) || game.players[0];
-    const isMyTurn = game.myId === null || game.currentTurnPlayerId === game.myId;
-
-    ctx.font = '13px -apple-system, system-ui, sans-serif';
-    ctx.fillStyle = isMyTurn ? '#4ecdc4' : '#aaaaaa';
-    ctx.fillText(turnPlayer.name || 'Player', rightX - 14, midY);
-
-    // Color dot
-    const dotColor = turnPlayer.color || '#4ecdc4';
-    ctx.beginPath();
-    ctx.arc(rightX - 6, midY, 5, 0, Math.PI * 2);
-    ctx.fillStyle = dotColor;
-    ctx.fill();
+    ctx.fillText(`#${game.roomCode}`, rightX, midY);
   } else if (game.playerName) {
     // Solo mode - show player name
     ctx.font = '13px -apple-system, system-ui, sans-serif';
     ctx.fillStyle = '#aaaaaa';
     ctx.fillText(game.playerName, rightX, midY);
   }
+}
+
+// ---------------------------------------------------------------------------
+// HUD: Multiplayer player list panel
+// ---------------------------------------------------------------------------
+
+function drawPlayerList(ctx, game, viewport) {
+  if (game.mode !== 'mp') return;
+  if (!game.players || game.players.length === 0) return;
+
+  const { w } = viewport;
+  const panelW = Math.min(140, Math.floor(w * 0.28));
+  const rowH = 28;
+  const padX = 10;
+  const panelX = w - panelW - 8;
+  const panelY = 56;
+  const panelH = game.players.length * rowH + 8;
+
+  // Panel background
+  ctx.save();
+  ctx.beginPath();
+  roundRect(ctx, panelX, panelY, panelW, panelH, 8);
+  ctx.fillStyle = 'rgba(0,0,0,0.4)';
+  ctx.fill();
+
+  for (let i = 0; i < game.players.length; i++) {
+    const player = game.players[i];
+    const rowY = panelY + 4 + i * rowH;
+    const isActive = player.id === game.currentTurnPlayerId;
+    const isMe = player.id === game.myId;
+
+    if (isActive) {
+      // Highlight row
+      ctx.beginPath();
+      roundRect(ctx, panelX + 2, rowY, panelW - 4, rowH - 2, 5);
+      ctx.fillStyle = 'rgba(78,205,196,0.2)';
+      ctx.fill();
+      // Left accent bar
+      ctx.fillStyle = '#4ecdc4';
+      ctx.fillRect(panelX + 2, rowY, 2, rowH - 2);
+    }
+
+    // Color dot
+    const dotX = panelX + padX + 6;
+    const dotY = rowY + rowH / 2;
+    ctx.beginPath();
+    ctx.arc(dotX, dotY, 6, 0, Math.PI * 2);
+    ctx.fillStyle = player.color || '#4ecdc4';
+    ctx.fill();
+
+    // Player name (truncated)
+    const nameX = dotX + 10;
+    const maxNameW = panelW - padX - 10 - 14 - 8; // leave room for score
+    ctx.font = isMe ? 'bold 11px -apple-system, system-ui, sans-serif' : '11px -apple-system, system-ui, sans-serif';
+    ctx.fillStyle = isActive ? '#4ecdc4' : '#ffffff';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    // Truncate name to fit
+    let displayName = player.name || `P${player.id}`;
+    while (displayName.length > 1 && ctx.measureText(displayName).width > maxNameW) {
+      displayName = displayName.slice(0, -1);
+    }
+    ctx.fillText(displayName, nameX, dotY);
+
+    // Score: sum of scorecard or current strokes
+    let score = 0;
+    if (player.scorecard) {
+      score = player.scorecard.reduce((s, v) => s + (v !== null ? v : 0), 0);
+    }
+    if (player.id === game.myId) {
+      score += game.strokes || 0;
+    }
+    ctx.font = '10px -apple-system, system-ui, sans-serif';
+    ctx.fillStyle = isActive ? '#4ecdc4' : 'rgba(255,255,255,0.6)';
+    ctx.textAlign = 'right';
+    ctx.fillText(score > 0 ? score : '-', panelX + panelW - 6, dotY);
+  }
+
+  ctx.restore();
+}
+
+// Helper: draw a rounded rect path
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
 }
 
 // ---------------------------------------------------------------------------
@@ -1414,9 +1489,10 @@ function drawCourseAndGame(ctx, game, viewport, currentHole, strokes, ball, ball
   // End course-space transform
   ctx.restore();
 
-  // 16-18. HUD (screen space)
+  // 16-19. HUD (screen space)
   drawTopBar(ctx, game, viewport);
   drawMpTurnIndicator(ctx, game, viewport);
+  drawPlayerList(ctx, game, viewport);
   drawScoreTicker(ctx, game, viewport);
 
   ctx.restore(); // screen shake
