@@ -617,7 +617,9 @@ function drawAimLine(ctx, ball, input) {
   ctx.setLineDash([]);
 
   // Power line (gradient green -> yellow -> red)
-  const powerLen = (shotPower || 0) * 100;
+  // Apply quadratic curve to match actual power feel (gentle at start, aggressive at end)
+  const curvedPower = (shotPower || 0) * (shotPower || 0);
+  const powerLen = curvedPower * 120;
   if (powerLen > 2) {
     const pEndX = bx + Math.cos(shotAngle) * powerLen;
     const pEndY = by + Math.sin(shotAngle) * powerLen;
