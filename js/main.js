@@ -147,7 +147,7 @@ function wireSession(sess) {
       color: p.color,
     }));
 
-    startMultiplayerGame(game, data.turnOrder, sess.id, players);
+    startMultiplayerGame(game, data.turnOrder, sess.id, players, sess.code);
   });
 
   sess.on('turnStart', data => {

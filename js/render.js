@@ -478,9 +478,9 @@ function drawTrail(ctx, trail) {
 // ---------------------------------------------------------------------------
 
 function drawOtherBalls(ctx, balls) {
-  if (!balls || balls.length === 0) return;
+  if (!balls || !Array.isArray(balls) || balls.length === 0) return;
   for (const ball of balls) {
-    if (!ball) continue;
+    if (!ball || ball.x === undefined) continue;
     const color = ball.color || '#4ecdc4';
 
     // Shadow
@@ -749,8 +749,11 @@ function drawTopBar(ctx, game, viewport) {
     ctx.arc(rightX - 6, midY, 5, 0, Math.PI * 2);
     ctx.fillStyle = dotColor;
     ctx.fill();
-  } else {
-    // Solo - just show nothing extra on the right
+  } else if (game.playerName) {
+    // Solo mode - show player name
+    ctx.font = '13px -apple-system, system-ui, sans-serif';
+    ctx.fillStyle = '#aaaaaa';
+    ctx.fillText(game.playerName, rightX, midY);
   }
 }
 
@@ -927,10 +930,7 @@ function drawTitleScreen(ctx, game, viewport) {
   ctx.fillText('MINI GOLF', w / 2, h * 0.28);
   ctx.shadowBlur = 0;
 
-  // Subtitle
-  ctx.font = `${Math.min(18, w / 22)}px -apple-system, system-ui, sans-serif`;
-  ctx.fillStyle = 'rgba(255,255,255,0.45)';
-  ctx.fillText('mccarrison.me/golf', w / 2, h * 0.28 + Math.min(72, w / 5) * 0.75);
+  // (subtitle removed)
 
   // Buttons are rendered via HTML overlay (#title-buttons)
 }
@@ -1187,7 +1187,18 @@ export function render(ctx, game, viewport) {
   const currentHole = game.currentHole || 0;
   const strokes = game.strokes || 0;
   const ball = game.ball || null;
-  const balls = game.balls || [];
+  // game.balls is an object {playerId: {x,y,vx,vy}} in MP mode - convert to array for renderer
+  const ballsRaw = game.balls || {};
+  let balls;
+  if (Array.isArray(ballsRaw)) {
+    balls = ballsRaw;
+  } else {
+    // Convert object to array, attaching player color from game.players
+    balls = Object.entries(ballsRaw).map(([pid, b]) => {
+      const player = (game.players || []).find(p => String(p.id) === String(pid));
+      return { ...b, color: player ? player.color : '#4ecdc4', name: player ? player.name : '' };
+    }).filter(b => b.x !== undefined);
+  }
   const trail = game.trail || [];
   const input = game.input || {};
   const time = game.time || 0;
