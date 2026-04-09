@@ -792,17 +792,10 @@ function drawScoreTicker(ctx, game, viewport) {
   ctx.font = 'bold 12px -apple-system, system-ui, sans-serif';
   const summaryW = ctx.measureText(summaryText).width + 24;
 
-  const scoreDiff = totalScore - totalPar;
-  const diffText = scoreDiff === 0 ? 'E' : (scoreDiff > 0 ? `+${scoreDiff}` : `${scoreDiff}`);
-  const diffColor = scoreDiff < 0 ? '#4ecdc4' : scoreDiff > 0 ? '#ff6b6b' : '#ffffff';
-
   ctx.textAlign = 'right';
   ctx.textBaseline = 'middle';
   ctx.fillStyle = '#aaaaaa';
-  ctx.fillText(summaryText, w - 16, barY + barH / 2 - 1);
-  ctx.fillStyle = diffColor;
-  ctx.font = 'bold 13px -apple-system, system-ui, sans-serif';
-  ctx.fillText(diffText, w - 16 + ctx.measureText(summaryText).width - ctx.measureText(summaryText).width + ctx.measureText(diffText).width * 0, barY + barH / 2 + 9);
+  ctx.fillText(summaryText, w - 16, barY + barH / 2);
 
   // Hole numbers 1-9 across available width
   const availW = w - summaryW;
