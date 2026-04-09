@@ -12,13 +12,19 @@ import { BALL_RADIUS, HOLE_RADIUS } from './physics.js';
  * Compute the course-to-screen transform parameters.
  * Returns { scale, offsetX, offsetY }
  */
-function getCourseTransform(course, viewport) {
-  const padding = 60;
-  const scaleX = (viewport.w - padding * 2) / course.bounds.width;
-  const scaleY = (viewport.h - padding * 2) / course.bounds.height;
-  const scale = Math.min(scaleX, scaleY);
-  const offsetX = (viewport.w - course.bounds.width * scale) / 2;
-  const offsetY = (viewport.h - course.bounds.height * scale) / 2;
+function getCourseTransform(course, viewport, zoom) {
+  const sidePad = 12;
+  const topPad = 54;   // HUD top bar (48px) + margin
+  const botPad = 46;   // HUD score ticker (40px) + margin
+  const availW = viewport.w - sidePad * 2;
+  const availH = viewport.h - topPad - botPad;
+  const scaleX = availW / course.bounds.width;
+  const scaleY = availH / course.bounds.height;
+  const baseScale = Math.min(scaleX, scaleY);
+  const z = zoom || { level: 1, panX: 0, panY: 0 };
+  const scale = baseScale * z.level;
+  const offsetX = sidePad + (availW - course.bounds.width * scale) / 2 + z.panX;
+  const offsetY = topPad + (availH - course.bounds.height * scale) / 2 + z.panY;
   return { scale, offsetX, offsetY };
 }
 
@@ -27,7 +33,7 @@ function getCourseTransform(course, viewport) {
  */
 export function worldToScreen(wx, wy, game, viewport) {
   const course = COURSES[game.currentHole || 0];
-  const { scale, offsetX, offsetY } = getCourseTransform(course, viewport);
+  const { scale, offsetX, offsetY } = getCourseTransform(course, viewport, game.zoom);
   return {
     x: wx * scale + offsetX,
     y: wy * scale + offsetY,
@@ -39,7 +45,7 @@ export function worldToScreen(wx, wy, game, viewport) {
  */
 export function screenToWorld(sx, sy, game, viewport) {
   const course = COURSES[game.currentHole || 0];
-  const { scale, offsetX, offsetY } = getCourseTransform(course, viewport);
+  const { scale, offsetX, offsetY } = getCourseTransform(course, viewport, game.zoom);
   return {
     x: (sx - offsetX) / scale,
     y: (sy - offsetY) / scale,
@@ -610,13 +616,19 @@ function drawAimLine(ctx, ball, input) {
   ctx.stroke();
   ctx.setLineDash([]);
 
-  // Power line (gradient green -> yellow -> red)
-  const powerLen = (shotPower || 0) * 100;
+  // Power line - color shows absolute power level, not stretched gradient
+  // Apply quadratic curve to match actual power feel
+  const curvedPower = (shotPower || 0) * (shotPower || 0);
+  const maxBarLen = 120;
+  const powerLen = curvedPower * maxBarLen;
   if (powerLen > 2) {
     const pEndX = bx + Math.cos(shotAngle) * powerLen;
     const pEndY = by + Math.sin(shotAngle) * powerLen;
 
-    const powerGrad = ctx.createLinearGradient(bx, by, pEndX, pEndY);
+    // Gradient spans the full max length so color reflects absolute power
+    const fullEndX = bx + Math.cos(shotAngle) * maxBarLen;
+    const fullEndY = by + Math.sin(shotAngle) * maxBarLen;
+    const powerGrad = ctx.createLinearGradient(bx, by, fullEndX, fullEndY);
     powerGrad.addColorStop(0, '#4ecdc4');
     powerGrad.addColorStop(0.5, '#f9d423');
     powerGrad.addColorStop(1, '#ff6b6b');
@@ -780,17 +792,10 @@ function drawScoreTicker(ctx, game, viewport) {
   ctx.font = 'bold 12px -apple-system, system-ui, sans-serif';
   const summaryW = ctx.measureText(summaryText).width + 24;
 
-  const scoreDiff = totalScore - totalPar;
-  const diffText = scoreDiff === 0 ? 'E' : (scoreDiff > 0 ? `+${scoreDiff}` : `${scoreDiff}`);
-  const diffColor = scoreDiff < 0 ? '#4ecdc4' : scoreDiff > 0 ? '#ff6b6b' : '#ffffff';
-
   ctx.textAlign = 'right';
   ctx.textBaseline = 'middle';
   ctx.fillStyle = '#aaaaaa';
-  ctx.fillText(summaryText, w - 16, barY + barH / 2 - 1);
-  ctx.fillStyle = diffColor;
-  ctx.font = 'bold 13px -apple-system, system-ui, sans-serif';
-  ctx.fillText(diffText, w - 16 + ctx.measureText(summaryText).width - ctx.measureText(summaryText).width + ctx.measureText(diffText).width * 0, barY + barH / 2 + 9);
+  ctx.fillText(summaryText, w - 16, barY + barH / 2);
 
   // Hole numbers 1-9 across available width
   const availW = w - summaryW;
@@ -1236,7 +1241,7 @@ function drawCourseAndGame(ctx, game, viewport, currentHole, strokes, ball, ball
   const course = COURSES[currentHole];
   if (!course) return;
 
-  const { scale, offsetX, offsetY } = getCourseTransform(course, viewport);
+  const { scale, offsetX, offsetY } = getCourseTransform(course, viewport, game.zoom);
 
   // Apply screen shake in screen space
   ctx.save();

@@ -32,7 +32,7 @@ not_found_handling = "single-page-application"
 [[d1_databases]]
 binding = "DB"
 database_name = "minigolf-dev"
-database_id = "placeholder-dev-db-id"
+database_id = "dc7dd875-94a9-412f-9530-16fca7c1a531"
 
 # Durable Objects: same Room class, but because this worker has a
 # different name (golfdev-api), the namespace is fully separate from

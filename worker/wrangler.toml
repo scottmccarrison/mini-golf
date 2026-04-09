@@ -21,7 +21,7 @@ not_found_handling = "single-page-application"
 [[d1_databases]]
 binding = "DB"
 database_name = "minigolf"
-database_id = "placeholder-db-id"
+database_id = "c5b367e5-c07b-49f5-a84e-d3ccd814c084"
 
 [[durable_objects.bindings]]
 name = "ROOMS"

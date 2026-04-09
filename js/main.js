@@ -5,7 +5,8 @@ import { COURSES } from './courses.js';
 import { DT } from './physics.js';
 import { initInput, getInput, resetInput, setEnabled } from './input.js';
 import { render, worldToScreen, screenToWorld } from './render.js';
-import { createGame, updateGame } from './game.js';
+import { createGame, updateGame, startMultiplayerGame, applyShot, applyBallUpdate, applyTurnComplete, applyTurnStart, applyHoleComplete, applyGameOver } from './game.js';
+import { createSession } from './net.js';
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -28,6 +29,237 @@ nameInput.addEventListener('input', () => {
   nameInput.value = name;
   game.playerName = name;
   localStorage.setItem('golf-name', name);
+});
+
+// ---------------------------------------------------------------------------
+// Multiplayer session state
+// ---------------------------------------------------------------------------
+
+let session = null;
+
+// Ball update throttle - send ~10 updates/sec during rolling
+let _ballUpdateTick = 0;
+const BALL_UPDATE_INTERVAL = 6; // every 6 physics steps at 60fps = 10/sec
+
+// Track when we've sent turnComplete for the current turn (avoid double-send)
+let _sentTurnComplete = false;
+
+// ---------------------------------------------------------------------------
+// Multiplayer UI helpers
+// ---------------------------------------------------------------------------
+
+function showMpModal() {
+  document.getElementById('mp-modal').classList.remove('hidden');
+}
+
+function hideMpModal() {
+  document.getElementById('mp-modal').classList.add('hidden');
+}
+
+function resetMpModal() {
+  document.getElementById('mp-pre-join').classList.remove('hidden');
+  document.getElementById('mp-roster-wrap').classList.add('hidden');
+  document.getElementById('mp-code-row').classList.add('hidden');
+  document.getElementById('mp-ready').classList.add('hidden');
+  document.getElementById('mp-ready').disabled = true;
+  document.getElementById('mp-status').textContent = '\u00a0';
+  document.getElementById('mp-code-display').textContent = '';
+  document.getElementById('mp-roster').innerHTML = '';
+  document.getElementById('mp-roster-count').textContent = '0/8';
+}
+
+function renderMpRoster(roster, myId) {
+  const container = document.getElementById('mp-roster');
+  const countEl = document.getElementById('mp-roster-count');
+  countEl.textContent = `${roster.length}/8`;
+  container.innerHTML = '';
+  for (const player of roster) {
+    const row = document.createElement('div');
+    row.className = 'mp-row' + (player.id === myId ? ' mp-row-self' : '');
+    row.dataset.playerId = player.id;
+
+    const swatch = document.createElement('span');
+    swatch.className = 'mp-swatch';
+    swatch.style.background = player.color;
+
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'mp-name';
+    nameSpan.textContent = player.name || `anon${player.id}`;
+
+    const hostTag = player.isHost ? ' <span class="mp-tag">(host)</span>' : '';
+
+    const readyIcon = document.createElement('span');
+    readyIcon.className = 'mp-ready-icon';
+    readyIcon.textContent = player.ready ? '\u2713' : '';
+
+    row.appendChild(swatch);
+    row.appendChild(nameSpan);
+    if (player.isHost) {
+      const tag = document.createElement('span');
+      tag.className = 'mp-tag';
+      tag.textContent = '(host)';
+      row.appendChild(tag);
+    }
+    row.appendChild(readyIcon);
+    container.appendChild(row);
+  }
+}
+
+function updatePlayerReadyIcon(playerId, isReady) {
+  const row = document.querySelector(`[data-player-id="${playerId}"] .mp-ready-icon`);
+  if (row) row.textContent = isReady ? '\u2713' : '';
+}
+
+// ---------------------------------------------------------------------------
+// Wire a session to game events
+// ---------------------------------------------------------------------------
+
+function wireSession(sess) {
+  sess.on('welcome', data => {
+    document.getElementById('mp-pre-join').classList.add('hidden');
+    document.getElementById('mp-roster-wrap').classList.remove('hidden');
+    document.getElementById('mp-ready').classList.remove('hidden');
+    document.getElementById('mp-ready').disabled = false;
+    document.getElementById('mp-status').textContent = 'Waiting for players...';
+    renderMpRoster(data.roster, data.id);
+  });
+
+  sess.on('peerJoined', () => {
+    renderMpRoster(sess.roster, sess.id);
+  });
+
+  sess.on('peerLeft', () => {
+    renderMpRoster(sess.roster, sess.id);
+  });
+
+  sess.on('peerReady', data => {
+    updatePlayerReadyIcon(data.id, true);
+    document.getElementById('mp-status').textContent = 'Some players are ready...';
+  });
+
+  sess.on('start', data => {
+    hideMpModal();
+    _sentTurnComplete = false;
+
+    const players = sess.roster.map(p => ({
+      id: p.id,
+      name: p.name || `anon${p.id}`,
+      color: p.color,
+    }));
+
+    startMultiplayerGame(game, data.turnOrder, sess.id, players);
+  });
+
+  sess.on('turnStart', data => {
+    _sentTurnComplete = false;
+    applyTurnStart(game, data.playerId, data.currentHole, data.playerId === sess.id);
+  });
+
+  sess.on('shot', data => {
+    applyShot(game, data.id, data.angle, data.power);
+  });
+
+  sess.on('ballUpdate', data => {
+    applyBallUpdate(game, data.id, data.x, data.y, data.vx, data.vy);
+  });
+
+  sess.on('turnComplete', data => {
+    applyTurnComplete(game, data.id, data.strokes, data.sunk);
+  });
+
+  sess.on('holeComplete', data => {
+    applyHoleComplete(game, data.holeIndex, data.scores, data.nextHole);
+  });
+
+  sess.on('gameOver', data => {
+    applyGameOver(game, data.finalScores);
+    session = null;
+  });
+
+  sess.on('kicked', () => {
+    hideMpModal();
+    resetMpModal();
+    session = null;
+    game = createGame();
+  });
+
+  sess.on('close', () => {
+    if (session === sess) {
+      session = null;
+    }
+  });
+
+  sess.on('error', () => {
+    document.getElementById('mp-status').textContent = 'Connection error. Please try again.';
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Multiplayer button handlers
+// ---------------------------------------------------------------------------
+
+const mpModal = document.getElementById('mp-modal');
+const mpBtn = document.createElement('button');
+mpBtn.id = 'mp-open-btn';
+mpBtn.type = 'button';
+mpBtn.title = 'Multiplayer';
+mpBtn.textContent = '\uD83C\uDFC4'; // golfer emoji
+document.getElementById('top-right').insertBefore(mpBtn, document.getElementById('help-btn'));
+
+mpBtn.addEventListener('click', () => {
+  if (game.state !== 'title' && game.state !== 'gameover' && game.mode !== 'mp') {
+    return; // don't open mid-game
+  }
+  resetMpModal();
+  showMpModal();
+});
+
+document.getElementById('mp-host').addEventListener('click', async () => {
+  if (session) { session.close(); session = null; }
+  session = createSession();
+  wireSession(session);
+  document.getElementById('mp-status').textContent = 'Creating room...';
+  try {
+    const code = await session.host();
+    document.getElementById('mp-code-row').classList.remove('hidden');
+    document.getElementById('mp-code-display').textContent = code;
+  } catch (e) {
+    document.getElementById('mp-status').textContent = 'Failed to create room.';
+    session = null;
+  }
+});
+
+document.getElementById('mp-join-go').addEventListener('click', () => {
+  const codeInput = document.getElementById('mp-code-input');
+  const code = codeInput.value.toUpperCase().trim();
+  if (code.length !== 4) {
+    document.getElementById('mp-status').textContent = 'Enter a 4-letter code.';
+    return;
+  }
+  if (session) { session.close(); session = null; }
+  session = createSession();
+  wireSession(session);
+  document.getElementById('mp-status').textContent = 'Joining room...';
+  session.join(code);
+});
+
+document.getElementById('mp-ready').addEventListener('click', () => {
+  if (session) {
+    session.sendReady();
+    document.getElementById('mp-ready').disabled = true;
+    document.getElementById('mp-status').textContent = 'Waiting for others...';
+  }
+});
+
+document.getElementById('mp-cancel').addEventListener('click', () => {
+  if (session) { session.close(); session = null; }
+  resetMpModal();
+  hideMpModal();
+});
+
+// Force uppercase on join code input
+document.getElementById('mp-code-input').addEventListener('input', (e) => {
+  e.target.value = e.target.value.toUpperCase();
 });
 
 // ---------------------------------------------------------------------------
@@ -87,10 +319,50 @@ function gameLoop(timestamp) {
   // Enable input only when the player can aim
   setEnabled(game.state === 'aiming');
 
+  // Capture shot before updateGame transitions state from aiming to rolling
+  const wasAiming = game.state === 'aiming';
+  const shotFired = wasAiming && rawInput.released && rawInput.shotPower > 0;
+  const capturedAngle = rawInput.shotAngle;
+  const capturedPower = rawInput.shotPower;
+
   // Fixed-timestep physics updates
   while (accumulator >= DT) {
     game = updateGame(game, rawInput, viewport, DT);
     accumulator -= DT;
+
+    // Multiplayer: send ball position while rolling (~10/sec)
+    if (session && game.mode === 'mp' && game.state === 'rolling') {
+      _ballUpdateTick++;
+      if (_ballUpdateTick >= BALL_UPDATE_INTERVAL) {
+        _ballUpdateTick = 0;
+        session.sendBallUpdate(game.ball.x, game.ball.y, game.ball.vx, game.ball.vy);
+      }
+    }
+  }
+
+  // Multiplayer: send shot after state transitions to rolling
+  if (session && game.mode === 'mp' && shotFired && game.state === 'rolling') {
+    session.sendShot(capturedAngle, capturedPower);
+    _ballUpdateTick = 0;
+  }
+
+  // Multiplayer: detect when our ball has stopped or sunk (rolling -> aiming/sunk/hazard)
+  if (session && game.mode === 'mp' && !_sentTurnComplete) {
+    const wasRolling = wasAiming === false; // slightly roundabout but safe
+    // Check if we just transitioned OUT of rolling
+    if (game.state === 'aiming' || game.state === 'sunk' || game.state === 'hazard') {
+      // We came from rolling if we got here (updateGame transitions rolling -> these)
+      // Use a flag on game to track this
+      if (game._wasRolling) {
+        game._wasRolling = false;
+        _sentTurnComplete = true;
+        const sunk = game.state === 'sunk';
+        session.sendTurnComplete(game.strokes, sunk);
+      }
+    }
+    if (game.state === 'rolling') {
+      game._wasRolling = true;
+    }
   }
 
   // Reset input AFTER processing a released shot so the state machine saw it
@@ -105,20 +377,77 @@ function gameLoop(timestamp) {
 }
 
 // ---------------------------------------------------------------------------
+// Pinch-to-zoom and pan
+// ---------------------------------------------------------------------------
+
+let pinchStartDist = 0;
+let pinchStartZoom = 1;
+let pinchStartPan = { x: 0, y: 0 };
+let pinchStartMid = { x: 0, y: 0 };
+
+function getTouchDist(t1, t2) {
+  const dx = t1.clientX - t2.clientX;
+  const dy = t1.clientY - t2.clientY;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+function getTouchMid(t1, t2) {
+  return { x: (t1.clientX + t2.clientX) / 2, y: (t1.clientY + t2.clientY) / 2 };
+}
+
+canvas.addEventListener('touchstart', (e) => {
+  if (e.touches.length === 2) {
+    pinchStartDist = getTouchDist(e.touches[0], e.touches[1]);
+    pinchStartZoom = game.zoom.level;
+    pinchStartPan = { x: game.zoom.panX, y: game.zoom.panY };
+    pinchStartMid = getTouchMid(e.touches[0], e.touches[1]);
+    e.preventDefault();
+  }
+}, { passive: false });
+
+canvas.addEventListener('touchmove', (e) => {
+  if (e.touches.length === 2) {
+    const dist = getTouchDist(e.touches[0], e.touches[1]);
+    const mid = getTouchMid(e.touches[0], e.touches[1]);
+    const scaleFactor = dist / pinchStartDist;
+    game.zoom.level = Math.max(1, Math.min(4, pinchStartZoom * scaleFactor));
+    game.zoom.panX = pinchStartPan.x + (mid.x - pinchStartMid.x);
+    game.zoom.panY = pinchStartPan.y + (mid.y - pinchStartMid.y);
+    e.preventDefault();
+  }
+}, { passive: false });
+
+canvas.addEventListener('touchend', (e) => {
+  // Snap back to 1x if barely zoomed
+  if (e.touches.length < 2 && game.zoom.level < 1.1) {
+    game.zoom.level = 1;
+    game.zoom.panX = 0;
+    game.zoom.panY = 0;
+  }
+}, { passive: false });
+
+// Double-tap to reset zoom
+let lastTapTime = 0;
+canvas.addEventListener('touchend', (e) => {
+  if (e.touches.length === 0 && e.changedTouches.length === 1) {
+    const now = Date.now();
+    if (now - lastTapTime < 300 && game.zoom.level > 1) {
+      game.zoom.level = 1;
+      game.zoom.panX = 0;
+      game.zoom.panY = 0;
+      e.preventDefault();
+    }
+    lastTapTime = now;
+  }
+}, { passive: false });
+
+// ---------------------------------------------------------------------------
 // iOS gesture prevention
 // ---------------------------------------------------------------------------
 
 document.addEventListener('gesturestart', (e) => e.preventDefault());
 document.addEventListener('gesturechange', (e) => e.preventDefault());
 document.addEventListener('dblclick', (e) => e.preventDefault());
-
-// Block iOS double-tap zoom
-let lastTouchEnd = 0;
-document.addEventListener('touchend', (e) => {
-  const now = Date.now();
-  if (now - lastTouchEnd < 350) e.preventDefault();
-  lastTouchEnd = now;
-}, { passive: false });
 
 // ---------------------------------------------------------------------------
 // Bootstrap
