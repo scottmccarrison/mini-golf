@@ -281,7 +281,7 @@ const hole8 = {
 const hole9 = {
   name: 'The Gauntlet',
   par: 5,
-  tee: { x: 160, y: 680 },
+  tee: { x: 160, y: 730 },
   hole: { x: 440, y: 160 },
   holeRadius: 12,
   bounds: { width: 600, height: 800 },

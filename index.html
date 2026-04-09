@@ -11,13 +11,26 @@
   <canvas id="game"></canvas>
 
   <div id="top-right">
-    <input id="name-input" type="text" maxlength="4" placeholder="name" autocomplete="off" />
+    <input id="name-input" type="text" maxlength="10" placeholder="name" autocomplete="off" />
     <button id="help-btn" type="button" title="report a bug or suggestion">?</button>
   </div>
 
   <div id="title-buttons">
     <button id="btn-solo" class="title-btn title-btn-primary">Single Player</button>
     <button id="btn-multi" class="title-btn title-btn-secondary">Multiplayer</button>
+    <button id="btn-lb" class="title-btn title-btn-tertiary">Leaderboard</button>
+  </div>
+
+  <div id="lb-modal" class="hidden" role="dialog" aria-modal="true">
+    <div class="lb-card">
+      <div class="lb-tabs">
+        <button class="lb-tab active" data-tab="daily">Daily</button>
+        <button class="lb-tab" data-tab="alltime">All-Time</button>
+        <button class="lb-tab" data-tab="personal">Personal</button>
+      </div>
+      <div id="lb-list" class="lb-list"></div>
+      <button id="lb-close" class="lb-close-btn">Close</button>
+    </div>
   </div>
 
   <div id="feedback-modal" class="hidden" role="dialog" aria-modal="true">

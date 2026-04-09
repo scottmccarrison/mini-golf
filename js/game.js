@@ -242,7 +242,14 @@ function updateSunk(game, dt) {
   if (game.animState.sinkTimer >= 1) {
     game.scorecard[game.currentHole] = game.strokes;
 
-    if (game.currentHole < 8) {
+    if (game.mode === 'mp') {
+      // In MP, hide the ball and wait for other players to finish the hole
+      game.ball.x = -999;
+      game.ball.y = -999;
+      game.ball.vx = 0;
+      game.ball.vy = 0;
+      game.state = 'spectating';
+    } else if (game.currentHole < 8) {
       game.state = 'nextHole';
       game.animState.holeTransition = 0;
       game.animState.holeTransitionPhase = 'out';
@@ -427,25 +434,32 @@ export function applyTurnComplete(game, playerId, strokes, sunk) {
  */
 export function applyTurnStart(game, playerId, currentHole, isMyTurn) {
   game.currentTurnPlayerId = playerId;
+  const holeChanged = game.currentHole !== currentHole;
   game.currentHole = currentHole;
 
   if (isMyTurn) {
-    game.strokes = 0;
-    game.trail = [];
-    game._trailStepCount = 0;
-    placeBallAtTee(game, currentHole);
+    if (holeChanged) {
+      // New hole: reset everything
+      game.strokes = 0;
+      game.trail = [];
+      game._trailStepCount = 0;
+      placeBallAtTee(game, currentHole);
+    }
+    // Same hole: keep strokes and ball position (continuing after other player's turn)
     game.state = 'aiming';
   } else {
     game.state = 'spectating';
-    // Reset that player's remote ball to tee position
-    const course = COURSES[currentHole];
-    if (course && game.balls) {
-      game.balls[playerId] = {
-        x: course.tee.x,
-        y: course.tee.y,
-        vx: 0,
-        vy: 0,
-      };
+    if (holeChanged) {
+      // New hole: reset remote ball to tee
+      const course = COURSES[currentHole];
+      if (course && game.balls) {
+        game.balls[playerId] = {
+          x: course.tee.x,
+          y: course.tee.y,
+          vx: 0,
+          vy: 0,
+        };
+      }
     }
   }
 }
@@ -465,6 +479,18 @@ export function applyHoleComplete(game, holeIndex, scores, nextHole) {
     game.scorecard[holeIndex] = scores[game.myId][holeIndex];
   }
   game.currentHole = nextHole;
+  game.strokes = 0;
+  game.trail = [];
+  game._trailStepCount = 0;
+  // Reset local ball and all remote balls to the new tee
+  placeBallAtTee(game, nextHole);
+  const course = COURSES[nextHole];
+  if (course && game.balls) {
+    for (const pid of Object.keys(game.balls)) {
+      game.balls[pid] = { x: course.tee.x, y: course.tee.y, vx: 0, vy: 0 };
+    }
+  }
+  game.zoom = { level: 1, panX: 0, panY: 0 };
 }
 
 /**

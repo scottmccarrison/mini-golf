@@ -72,31 +72,45 @@ function tracePolygon(ctx, points) {
 function drawCourseFloor(ctx, course) {
   if (!course.walls || course.walls.length === 0) return;
 
-  // Build a rough bounding polygon from the wall segments
-  // Collect unique points to form an approximate playable outline
-  const pts = [];
-  for (const w of course.walls) {
-    pts.push({ x: w.x1, y: w.y1 });
-    pts.push({ x: w.x2, y: w.y2 });
+  // Trace the outer boundary: follow connected wall segments starting from wall[0].
+  // Stop when we loop back to the start point or run out of connected walls.
+  // This skips internal walls (islands, chicanes) that aren't part of the outer perimeter.
+  const outerPts = [];
+  const walls = course.walls;
+  const used = new Set();
+
+  // Start with the first wall
+  outerPts.push({ x: walls[0].x1, y: walls[0].y1 });
+  outerPts.push({ x: walls[0].x2, y: walls[0].y2 });
+  used.add(0);
+
+  // Follow the chain: find the next wall whose start matches our current end
+  let current = { x: walls[0].x2, y: walls[0].y2 };
+  const start = { x: walls[0].x1, y: walls[0].y1 };
+  const eps = 2;
+
+  for (let iter = 0; iter < walls.length; iter++) {
+    let found = false;
+    for (let i = 0; i < walls.length; i++) {
+      if (used.has(i)) continue;
+      if (Math.abs(walls[i].x1 - current.x) < eps && Math.abs(walls[i].y1 - current.y) < eps) {
+        outerPts.push({ x: walls[i].x2, y: walls[i].y2 });
+        current = { x: walls[i].x2, y: walls[i].y2 };
+        used.add(i);
+        found = true;
+        break;
+      }
+    }
+    if (!found) break;
+    // Check if we've looped back to start
+    if (Math.abs(current.x - start.x) < eps && Math.abs(current.y - start.y) < eps) break;
   }
 
-  // Use a convex-hull-like ordered path: sort by angle from centroid
-  const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
-  const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
-  pts.sort((a, b) => Math.atan2(a.y - cy, a.x - cx) - Math.atan2(b.y - cy, b.x - cx));
-
-  // Build a connected path from wall segments preserving order
-  // Use the raw wall sequence instead - create a polygon by tracing walls in order
-  const wallPts = [];
-  for (const w of course.walls) {
-    wallPts.push({ x: w.x1, y: w.y1 });
-  }
-
-  // Fill main floor
+  // Fill the outer boundary
   ctx.beginPath();
-  ctx.moveTo(wallPts[0].x, wallPts[0].y);
-  for (let i = 1; i < wallPts.length; i++) {
-    ctx.lineTo(wallPts[i].x, wallPts[i].y);
+  ctx.moveTo(outerPts[0].x, outerPts[0].y);
+  for (let i = 1; i < outerPts.length; i++) {
+    ctx.lineTo(outerPts[i].x, outerPts[i].y);
   }
   ctx.closePath();
 
@@ -900,6 +914,116 @@ function drawMpTurnIndicator(ctx, game, viewport) {
 // ---------------------------------------------------------------------------
 
 function drawScoreTicker(ctx, game, viewport) {
+  const { w, h } = viewport;
+
+  if (game.mode === 'mp' && game.players && game.players.length > 0) {
+    drawMpBottomBar(ctx, game, viewport);
+  } else {
+    drawSoloBottomBar(ctx, game, viewport);
+  }
+}
+
+function drawMpBottomBar(ctx, game, viewport) {
+  const { w, h } = viewport;
+  const players = game.players;
+  const rowH = 18;
+  const headerH = 14;
+  const barH = headerH + rowH * players.length + 4;
+  const barY = h - barH;
+  const currentHole = game.currentHole || 0;
+
+  // Background
+  ctx.fillStyle = 'rgba(0,0,0,0.45)';
+  ctx.fillRect(0, barY, w, barH);
+  ctx.fillStyle = 'rgba(255,255,255,0.07)';
+  ctx.fillRect(0, barY, w, 1);
+
+  // Layout: [name col] [hole 1] [hole 2] ... [hole 9] [TOT]
+  const nameColW = 80;
+  const totColW = 30;
+  const holeAreaW = w - nameColW - totColW;
+  const holeColW = holeAreaW / 9;
+
+  // Header row: hole numbers 1-9 + TOT
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = '9px -apple-system, system-ui, sans-serif';
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  for (let hi = 0; hi < 9; hi++) {
+    const colX = nameColW + hi * holeColW + holeColW / 2;
+    const isCurrentH = hi === currentHole;
+    if (isCurrentH) ctx.fillStyle = 'rgba(78,205,196,0.6)';
+    ctx.fillText(String(hi + 1), colX, barY + headerH / 2 + 1);
+    if (isCurrentH) ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  }
+  ctx.fillText('TOT', w - totColW / 2, barY + headerH / 2 + 1);
+
+  for (let pi = 0; pi < players.length; pi++) {
+    const player = players[pi];
+    const isActive = player.id === game.currentTurnPlayerId;
+    const isMe = player.id === game.myId;
+    const ry = barY + headerH + 2 + pi * rowH;
+    const sc = player.scorecard || [];
+
+    // Active turn row highlight
+    if (isActive) {
+      ctx.fillStyle = 'rgba(78,205,196,0.12)';
+      ctx.fillRect(0, ry, w, rowH);
+    }
+
+    // Color dot + name
+    ctx.beginPath();
+    ctx.arc(8, ry + rowH / 2, 3, 0, Math.PI * 2);
+    ctx.fillStyle = player.color || '#4ecdc4';
+    ctx.fill();
+
+    let name = player.name || `P${player.id}`;
+    if (name.length > 10) name = name.slice(0, 10);
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.font = (isMe ? 'bold ' : '') + '10px -apple-system, system-ui, sans-serif';
+    ctx.fillStyle = isActive ? '#4ecdc4' : (isMe ? '#fff' : 'rgba(255,255,255,0.6)');
+    ctx.fillText(name, 16, ry + rowH / 2);
+
+    // Per-hole scores
+    let total = 0;
+    ctx.textAlign = 'center';
+    for (let hi = 0; hi < 9; hi++) {
+      const colX = nameColW + hi * holeColW + holeColW / 2;
+      const score = sc[hi];
+      const holePar = COURSES[hi] ? COURSES[hi].par : 3;
+
+      if (score !== null && score !== undefined) {
+        total += score;
+        const diff = score - holePar;
+        ctx.font = (diff !== 0 ? 'bold ' : '') + '10px -apple-system, system-ui, sans-serif';
+        ctx.fillStyle = diff < 0 ? '#4ecdc4' : diff > 0 ? '#ff6b6b' : '#fff';
+        ctx.fillText(String(score), colX, ry + rowH / 2);
+      } else if (hi === currentHole && isMe) {
+        // Current hole in-progress
+        const strokes = game.strokes || 0;
+        if (strokes > 0) {
+          ctx.font = '10px -apple-system, system-ui, sans-serif';
+          ctx.fillStyle = 'rgba(78,205,196,0.6)';
+          ctx.fillText(String(strokes), colX, ry + rowH / 2);
+        }
+      }
+    }
+
+    // Total
+    if (isMe) total += (game.strokes || 0);
+    ctx.font = 'bold 10px -apple-system, system-ui, sans-serif';
+    ctx.fillStyle = isActive ? '#4ecdc4' : '#fff';
+    ctx.fillText(total > 0 ? String(total) : '-', w - totColW / 2, ry + rowH / 2);
+  }
+
+  // Current hole column highlight
+  const hlX = nameColW + currentHole * holeColW;
+  ctx.fillStyle = 'rgba(78,205,196,0.08)';
+  ctx.fillRect(hlX, barY + 1, holeColW, barH - 2);
+}
+
+function drawSoloBottomBar(ctx, game, viewport) {
   const barH = 40;
   const { w, h } = viewport;
   const barY = h - barH;
@@ -907,8 +1031,6 @@ function drawScoreTicker(ctx, game, viewport) {
   // Background
   ctx.fillStyle = 'rgba(0,0,0,0.4)';
   ctx.fillRect(0, barY, w, barH);
-
-  // Top border
   ctx.fillStyle = 'rgba(255,255,255,0.07)';
   ctx.fillRect(0, barY, w, 1);
 
@@ -916,19 +1038,12 @@ function drawScoreTicker(ctx, game, viewport) {
   const currentHole = game.currentHole || 0;
   const scorecard = game.scorecard || [];
 
-  // Calculate total par
   let totalPar = 0;
-  for (const course of COURSES) {
-    totalPar += course.par;
-  }
-
-  // Calculate total score
+  for (const course of COURSES) totalPar += course.par;
   let totalScore = 0;
-  for (const s of scorecard) {
-    if (s !== null && s !== undefined) totalScore += s;
-  }
+  for (const s of scorecard) if (s !== null && s !== undefined) totalScore += s;
 
-  // Right side: total summary - measure it first to figure out available width
+  // Right: total summary
   const summaryText = `Total: ${totalScore}  (Par ${totalPar})`;
   ctx.font = 'bold 12px -apple-system, system-ui, sans-serif';
   const summaryW = ctx.measureText(summaryText).width + 24;
@@ -938,7 +1053,7 @@ function drawScoreTicker(ctx, game, viewport) {
   ctx.fillStyle = '#aaaaaa';
   ctx.fillText(summaryText, w - 16, barY + barH / 2);
 
-  // Hole numbers 1-9 across available width
+  // Hole numbers 1-9
   const availW = w - summaryW;
   const holeSlotW = availW / totalHoles;
 
@@ -946,18 +1061,14 @@ function drawScoreTicker(ctx, game, viewport) {
     const slotX = i * holeSlotW + holeSlotW / 2;
     const isCurrentHole = i === currentHole;
     const score = scorecard[i];
-    const course = COURSES[i];
-    const holePar = course ? course.par : 3;
+    const holePar = COURSES[i] ? COURSES[i].par : 3;
 
     ctx.textAlign = 'center';
-
-    // Hole number
     ctx.font = isCurrentHole
       ? 'bold 11px -apple-system, system-ui, sans-serif'
       : '10px -apple-system, system-ui, sans-serif';
 
     if (isCurrentHole) {
-      // Highlight background
       ctx.fillStyle = 'rgba(78,205,196,0.2)';
       ctx.fillRect(i * holeSlotW, barY + 1, holeSlotW, barH - 2);
       ctx.fillStyle = '#4ecdc4';
@@ -966,18 +1077,12 @@ function drawScoreTicker(ctx, game, viewport) {
     }
     ctx.fillText(String(i + 1), slotX, barY + 12);
 
-    // Score
     if (score !== null && score !== undefined) {
       const diff = score - holePar;
-      let scoreColor = '#ffffff'; // par
-      if (diff < 0) scoreColor = '#4ecdc4';   // under par
-      if (diff > 0) scoreColor = '#ff6b6b';   // over par
-
       ctx.font = 'bold 12px -apple-system, system-ui, sans-serif';
-      ctx.fillStyle = scoreColor;
+      ctx.fillStyle = diff < 0 ? '#4ecdc4' : diff > 0 ? '#ff6b6b' : '#ffffff';
       ctx.fillText(String(score), slotX, barY + 28);
     } else if (isCurrentHole) {
-      // Show current stroke in progress
       const strokes = game.strokes || 0;
       if (strokes > 0) {
         ctx.font = '11px -apple-system, system-ui, sans-serif';
@@ -1264,11 +1369,72 @@ function drawGameOver(ctx, game, viewport) {
     ctx.fillText(String(playerTotal), cardX + 20 + colW * 9 + colW / 2, tableY + rowH * (pi + 2) + rowH / 2);
   }
 
+  // Leaderboard section
+  let lbY = tableY + rowH * (players.length + 3);
+  const board = game._leaderboard;
+  if (board) {
+    const lbX = cardX + 16;
+    const lbW = cardW - 32;
+
+    // Tabs: Daily | All-Time | Personal
+    const tabs = ['Daily', 'All-Time', 'Personal'];
+    const activeTab = game._lbTab || 0;
+    const tabW = lbW / tabs.length;
+
+    for (let i = 0; i < tabs.length; i++) {
+      const tx = lbX + i * tabW;
+      const isActive = i === activeTab;
+      ctx.fillStyle = isActive ? 'rgba(78,205,196,0.15)' : 'transparent';
+      ctx.fillRect(tx, lbY, tabW, 22);
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = (isActive ? 'bold ' : '') + '11px -apple-system, system-ui, sans-serif';
+      ctx.fillStyle = isActive ? '#4ecdc4' : 'rgba(255,255,255,0.45)';
+      ctx.fillText(tabs[i], tx + tabW / 2, lbY + 11);
+    }
+    // Underline active tab
+    ctx.fillStyle = '#4ecdc4';
+    ctx.fillRect(lbX + activeTab * tabW + 4, lbY + 22, tabW - 8, 2);
+
+    lbY += 30;
+
+    // Get the right data
+    let entries = [];
+    if (activeTab === 0) entries = board.daily || [];
+    else if (activeTab === 1) entries = board.alltime || [];
+    else entries = (game._personalBests || []).map(e => ({ name: 'You', score: e.score }));
+
+    if (entries.length === 0) {
+      ctx.textAlign = 'center';
+      ctx.font = '12px -apple-system, system-ui, sans-serif';
+      ctx.fillStyle = 'rgba(255,255,255,0.35)';
+      ctx.fillText('No scores yet', w / 2, lbY + 16);
+      lbY += 36;
+    } else {
+      for (let i = 0; i < Math.min(entries.length, 5); i++) {
+        const entry = entries[i];
+        const ey = lbY + i * 20;
+
+        ctx.textAlign = 'left';
+        ctx.font = '11px -apple-system, system-ui, sans-serif';
+        ctx.fillStyle = i === 0 ? '#f9d423' : 'rgba(255,255,255,0.7)';
+        ctx.fillText(`${i + 1}.`, lbX + 4, ey + 10);
+        ctx.fillText(entry.name || 'anon', lbX + 22, ey + 10);
+
+        ctx.textAlign = 'right';
+        ctx.font = 'bold 11px -apple-system, system-ui, sans-serif';
+        ctx.fillStyle = i === 0 ? '#f9d423' : '#ffffff';
+        ctx.fillText(String(entry.score), lbX + lbW - 4, ey + 10);
+      }
+      lbY += Math.min(entries.length, 5) * 20 + 8;
+    }
+  }
+
   // Play Again button area
   const btnW = 160;
   const btnH = 44;
   const btnX = w / 2 - btnW / 2;
-  const btnY = tableY + rowH * (players.length + 3);
+  const btnY = lbY + 8;
 
   ctx.beginPath();
   ctx.roundRect(btnX, btnY, btnW, btnH, 8);
@@ -1492,7 +1658,6 @@ function drawCourseAndGame(ctx, game, viewport, currentHole, strokes, ball, ball
   // 16-19. HUD (screen space)
   drawTopBar(ctx, game, viewport);
   drawMpTurnIndicator(ctx, game, viewport);
-  drawPlayerList(ctx, game, viewport);
   drawScoreTicker(ctx, game, viewport);
 
   ctx.restore(); // screen shake
