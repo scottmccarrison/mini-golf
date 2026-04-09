@@ -616,15 +616,19 @@ function drawAimLine(ctx, ball, input) {
   ctx.stroke();
   ctx.setLineDash([]);
 
-  // Power line (gradient green -> yellow -> red)
-  // Apply quadratic curve to match actual power feel (gentle at start, aggressive at end)
+  // Power line - color shows absolute power level, not stretched gradient
+  // Apply quadratic curve to match actual power feel
   const curvedPower = (shotPower || 0) * (shotPower || 0);
-  const powerLen = curvedPower * 120;
+  const maxBarLen = 120;
+  const powerLen = curvedPower * maxBarLen;
   if (powerLen > 2) {
     const pEndX = bx + Math.cos(shotAngle) * powerLen;
     const pEndY = by + Math.sin(shotAngle) * powerLen;
 
-    const powerGrad = ctx.createLinearGradient(bx, by, pEndX, pEndY);
+    // Gradient spans the full max length so color reflects absolute power
+    const fullEndX = bx + Math.cos(shotAngle) * maxBarLen;
+    const fullEndY = by + Math.sin(shotAngle) * maxBarLen;
+    const powerGrad = ctx.createLinearGradient(bx, by, fullEndX, fullEndY);
     powerGrad.addColorStop(0, '#4ecdc4');
     powerGrad.addColorStop(0.5, '#f9d423');
     powerGrad.addColorStop(1, '#ff6b6b');
