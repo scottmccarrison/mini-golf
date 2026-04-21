@@ -10,34 +10,31 @@
 //   movingObstacles- windmills etc, see getMovingObstacleState
 //   slopes         - polygon regions that apply a constant acceleration to the ball
 //                    shape: { points: [...], ax: number, ay: number }
-//                    Force is in px/s^2. Typical values 5-20. Used to create subtle
-//                    curving putts and funnel effects without raising difficulty.
+//                    Force is in px/s^2. 50-150 is noticeable; 100+ strongly curves putts.
 
 // ---------------------------------------------------------------------------
-// Hole 1: "Straight Shot" (Par 2)
-// Hourglass corridor - narrow tee approach, wide courtyard mid, narrow neck at hole.
-// Still a straight-line putt but not a featureless pipe.
+// Hole 1: "Serpent" (Par 3)
+// Two offset wall dividers protruding from opposite sides. Ball must snake:
+// right past the first gap at y=540, then left past the second at y=300.
+// No straight-line shot possible.
 // ---------------------------------------------------------------------------
 const hole1 = {
-  name: 'Straight Shot',
-  par: 2,
-  tee: { x: 300, y: 700 },
+  name: 'Serpent',
+  par: 3,
+  tee: { x: 300, y: 720 },
   hole: { x: 300, y: 120 },
   holeRadius: 12,
   bounds: { width: 600, height: 800 },
   walls: [
-    { x1: 200, y1: 80,  x2: 400, y2: 80  }, // top of neck
-    { x1: 400, y1: 80,  x2: 400, y2: 200 }, // right of neck
-    { x1: 400, y1: 200, x2: 450, y2: 200 }, // right step out to courtyard
-    { x1: 450, y1: 200, x2: 450, y2: 600 }, // right of courtyard
-    { x1: 450, y1: 600, x2: 350, y2: 600 }, // right step in to tee corridor
-    { x1: 350, y1: 600, x2: 350, y2: 760 }, // right of tee corridor
-    { x1: 350, y1: 760, x2: 250, y2: 760 }, // bottom
-    { x1: 250, y1: 760, x2: 250, y2: 600 }, // left of tee corridor
-    { x1: 250, y1: 600, x2: 150, y2: 600 }, // left step out
-    { x1: 150, y1: 600, x2: 150, y2: 200 }, // left of courtyard
-    { x1: 150, y1: 200, x2: 200, y2: 200 }, // left step in
-    { x1: 200, y1: 200, x2: 200, y2: 80  }, // left of neck
+    // Outer corridor
+    { x1: 80,  y1: 80,  x2: 520, y2: 80  },
+    { x1: 520, y1: 80,  x2: 520, y2: 760 },
+    { x1: 520, y1: 760, x2: 80,  y2: 760 },
+    { x1: 80,  y1: 760, x2: 80,  y2: 80  },
+    // Lower divider protruding from left wall (gap on the right, x=380..520)
+    { x1: 80,  y1: 540, x2: 380, y2: 540 },
+    // Upper divider protruding from right wall (gap on the left, x=80..220)
+    { x1: 520, y1: 300, x2: 220, y2: 300 },
   ],
   bumpers: [],
   sandTraps: [],
@@ -46,92 +43,120 @@ const hole1 = {
 };
 
 // ---------------------------------------------------------------------------
-// Hole 2: "Gentle Bend" (Par 2)
-// Slight L-shape with a gravity slope at the corner that gently nudges the
-// ball up-and-right. Teaches that the floor isn't always flat.
+// Hole 2: "Slope Bend" (Par 3)
+// L-shape with a strong slope pulling the ball up-and-right through the
+// vertical leg, plus a wall island in the corner that blocks a direct
+// diagonal. A bumper in the horizontal leg adds a redirect near the hole.
 // ---------------------------------------------------------------------------
 const hole2 = {
-  name: 'Gentle Bend',
-  par: 2,
-  tee: { x: 175, y: 700 },
-  hole: { x: 430, y: 120 },
+  name: 'Slope Bend',
+  par: 3,
+  tee: { x: 175, y: 720 },
+  hole: { x: 470, y: 150 },
   holeRadius: 12,
   bounds: { width: 600, height: 800 },
   walls: [
-    { x1: 50,  y1: 80,  x2: 550, y2: 80  }, // top
-    { x1: 550, y1: 80,  x2: 550, y2: 280 }, // right of horizontal leg
-    { x1: 550, y1: 280, x2: 300, y2: 280 }, // inner bottom of horizontal leg
-    { x1: 300, y1: 280, x2: 300, y2: 760 }, // right of vertical leg
-    { x1: 300, y1: 760, x2: 50,  y2: 760 }, // bottom
-    { x1: 50,  y1: 760, x2: 50,  y2: 80  }, // left
+    { x1: 50,  y1: 80,  x2: 550, y2: 80  },
+    { x1: 550, y1: 80,  x2: 550, y2: 280 },
+    { x1: 550, y1: 280, x2: 300, y2: 280 },
+    { x1: 300, y1: 280, x2: 300, y2: 760 },
+    { x1: 300, y1: 760, x2: 50,  y2: 760 },
+    { x1: 50,  y1: 760, x2: 50,  y2: 80  },
+    // Wall island in the corner - blocks diagonal shortcut
+    { x1: 130, y1: 330, x2: 230, y2: 330 },
+    { x1: 230, y1: 330, x2: 230, y2: 430 },
+    { x1: 230, y1: 430, x2: 130, y2: 430 },
+    { x1: 130, y1: 430, x2: 130, y2: 330 },
   ],
-  bumpers: [],
+  bumpers: [
+    { x: 400, y: 180, r: 14, bounciness: 1.3 },
+  ],
   sandTraps: [],
   waterHazards: [],
   movingObstacles: [],
   slopes: [
     {
       points: [
-        { x: 80,  y: 200 },
-        { x: 300, y: 200 },
-        { x: 300, y: 400 },
-        { x: 80,  y: 400 },
+        { x: 60,  y: 460 },
+        { x: 290, y: 460 },
+        { x: 290, y: 700 },
+        { x: 60,  y: 700 },
       ],
-      ax: 15,
-      ay: -10,
+      ax: 100,
+      ay: -60,
     },
   ],
 };
 
 // ---------------------------------------------------------------------------
-// Hole 3: "The Dogleg" (Par 3)
-// Right-angle L-shape, narrower corridor (180px).
-// Unchanged - already the right amount of interesting.
+// Hole 3: "Z-Path" (Par 4)
+// Double-dogleg Z-shape. Bottom chamber (tee) -> middle connector ->
+// top chamber (hole). A bumper at the inner corner adds chaos on the
+// transition between middle and top chambers.
 // ---------------------------------------------------------------------------
 const hole3 = {
-  name: 'The Dogleg',
-  par: 3,
-  tee: { x: 175, y: 680 },
-  hole: { x: 450, y: 130 },
+  name: 'Z-Path',
+  par: 4,
+  tee: { x: 160, y: 720 },
+  hole: { x: 450, y: 150 },
   holeRadius: 12,
   bounds: { width: 600, height: 800 },
   walls: [
-    { x1: 86,  y1: 80,  x2: 540, y2: 80  },
-    { x1: 540, y1: 80,  x2: 540, y2: 280 },
-    { x1: 540, y1: 280, x2: 266, y2: 280 },
-    { x1: 266, y1: 280, x2: 266, y2: 760 },
-    { x1: 266, y1: 760, x2: 86,  y2: 760 },
-    { x1: 86,  y1: 760, x2: 86,  y2: 80  },
+    // Top chamber
+    { x1: 360, y1: 80,  x2: 520, y2: 80  },
+    { x1: 520, y1: 80,  x2: 520, y2: 400 },
+    // Bottom of middle connector (right half)
+    { x1: 520, y1: 400, x2: 240, y2: 400 },
+    // Right of bottom chamber
+    { x1: 240, y1: 400, x2: 240, y2: 760 },
+    // Bottom
+    { x1: 240, y1: 760, x2: 80,  y2: 760 },
+    // Left of bottom chamber
+    { x1: 80,  y1: 760, x2: 80,  y2: 320 },
+    // Top of middle connector (left half)
+    { x1: 80,  y1: 320, x2: 360, y2: 320 },
+    // Left of top chamber
+    { x1: 360, y1: 320, x2: 360, y2: 80  },
   ],
-  bumpers: [],
+  bumpers: [
+    { x: 370, y: 360, r: 14, bounciness: 1.3 },
+  ],
   sandTraps: [],
   waterHazards: [],
   movingObstacles: [],
 };
 
 // ---------------------------------------------------------------------------
-// Hole 4: "Bumper Funnel" (Par 3)
-// Bumpers arranged as a V-shaped funnel near the hole plus an off-center
-// redirect bumper lower down. Good shots get pinball-style funneled into the
-// cup; off-line shots get corrected rather than deflected away.
+// Hole 4: "Pinball" (Par 4)
+// Open chamber with a wall island dead-center on the tee-to-hole line, and
+// 6 scattered bumpers. Straight shot is impossible; ball pinballs around
+// the obstacles.
 // ---------------------------------------------------------------------------
 const hole4 = {
-  name: 'Bumper Funnel',
-  par: 3,
-  tee: { x: 300, y: 700 },
-  hole: { x: 300, y: 120 },
+  name: 'Pinball',
+  par: 4,
+  tee: { x: 300, y: 720 },
+  hole: { x: 300, y: 130 },
   holeRadius: 12,
   bounds: { width: 600, height: 800 },
   walls: [
-    { x1: 190, y1: 80,  x2: 410, y2: 80  },
-    { x1: 410, y1: 80,  x2: 410, y2: 760 },
-    { x1: 410, y1: 760, x2: 190, y2: 760 },
-    { x1: 190, y1: 760, x2: 190, y2: 80  },
+    { x1: 80,  y1: 80,  x2: 520, y2: 80  },
+    { x1: 520, y1: 80,  x2: 520, y2: 760 },
+    { x1: 520, y1: 760, x2: 80,  y2: 760 },
+    { x1: 80,  y1: 760, x2: 80,  y2: 80  },
+    // Wall island blocking direct tee-to-hole line
+    { x1: 240, y1: 360, x2: 360, y2: 360 },
+    { x1: 360, y1: 360, x2: 360, y2: 480 },
+    { x1: 360, y1: 480, x2: 240, y2: 480 },
+    { x1: 240, y1: 480, x2: 240, y2: 360 },
   ],
   bumpers: [
-    { x: 235, y: 260, r: 14, bounciness: 1.3 }, // left funnel gate
-    { x: 365, y: 260, r: 14, bounciness: 1.3 }, // right funnel gate
-    { x: 360, y: 470, r: 14, bounciness: 1.3 }, // lower redirect, off-center
+    { x: 180, y: 300, r: 14, bounciness: 1.3 },
+    { x: 450, y: 320, r: 14, bounciness: 1.3 },
+    { x: 150, y: 560, r: 14, bounciness: 1.3 },
+    { x: 440, y: 550, r: 14, bounciness: 1.3 },
+    { x: 300, y: 630, r: 14, bounciness: 1.3 },
+    { x: 300, y: 220, r: 14, bounciness: 1.3 },
   ],
   sandTraps: [],
   waterHazards: [],
@@ -140,9 +165,8 @@ const hole4 = {
 
 // ---------------------------------------------------------------------------
 // Hole 5: "The L with Teeth" (Par 4)
-// L-shape with interior wall island. Added a gentle slope in the vertical
-// leg that nudges shots up and slightly toward center, helping clean lines
-// navigate around the island chicane.
+// L-shape with interior wall island. Strong slope in the vertical leg
+// pushes the ball up past the chicane.
 // ---------------------------------------------------------------------------
 const hole5 = {
   name: 'The L with Teeth',
@@ -178,17 +202,17 @@ const hole5 = {
         { x: 275, y: 650 },
         { x: 90,  y: 650 },
       ],
-      ax: 8,
-      ay: -14,
+      ax: 60,
+      ay: -110,
     },
   ],
 };
 
 // ---------------------------------------------------------------------------
 // Hole 6: "Sand Island" (Par 3)
-// Was a forced wall-to-wall sand band. Now the sand is an island in the
-// middle of a widened corridor with ~80px lanes on either side. Direct
-// shot = risky through-sand; around shot = clean par line.
+// Sand island in the middle of a widened corridor with ~80px lanes on
+// either side. Direct = risky through-sand; around = clean par line.
+// Sand now slows dramatically - plan on losing a stroke if you go in.
 // ---------------------------------------------------------------------------
 const hole6 = {
   name: 'Sand Island',
@@ -226,9 +250,8 @@ const hole6 = {
 
 // ---------------------------------------------------------------------------
 // Hole 7: "Water Slalom" (Par 4)
-// Was a symmetric water wall with a center gap ("aim at the gap"). Now two
-// offset water patches create an S-slalom: go right of the first, left of
-// the second. Both lanes are generous (~180px) so it's interesting, not hard.
+// Two offset water patches force an S-slalom: right of the first, left of
+// the second. Both lanes ~180px wide. Water = +1 stroke, reset to prev pos.
 // ---------------------------------------------------------------------------
 const hole7 = {
   name: 'Water Slalom',
@@ -268,7 +291,7 @@ const hole7 = {
 
 // ---------------------------------------------------------------------------
 // Hole 8: "Windmill" (Par 4)
-// Classic windmill in a straight corridor. Unchanged - already interesting.
+// Classic windmill in a straight corridor. Unchanged.
 // ---------------------------------------------------------------------------
 const hole8 = {
   name: 'Windmill',
@@ -300,12 +323,9 @@ const hole8 = {
 
 // ---------------------------------------------------------------------------
 // Hole 9: "The Gauntlet" (Par 5)
-// S-curve with hazards placed INSIDE the natural shot path so they actually
-// matter. Sand trap in the lower-chamber approach. A small windmill guards
-// the sand. Water moat guards the hole in the upper chamber. A gentle slope
-// in the upper chamber funnels shots toward the cup as reward for surviving.
-// Multiple viable routes: left around the moat, or bank off the top wall
-// past it.
+// S-curve with hazards placed in the natural shot path. Sand in the lower
+// chamber approach, windmill guarding sand, water moat in the upper chamber
+// guarding the hole, and a strong slope funnel toward the cup.
 // ---------------------------------------------------------------------------
 const hole9 = {
   name: 'The Gauntlet',
@@ -365,17 +385,17 @@ const hole9 = {
       points: [
         { x: 300, y: 100 },
         { x: 540, y: 100 },
-        { x: 540, y: 220 },
-        { x: 300, y: 220 },
+        { x: 540, y: 230 },
+        { x: 300, y: 230 },
       ],
-      ax: 8,
-      ay: -4,
+      ax: 80,
+      ay: -40,
     },
   ],
 };
 
 // ---------------------------------------------------------------------------
-// Exported course list (total par: 2+2+3+3+4+3+4+4+5 = 30)
+// Exported course list (total par: 3+3+4+4+4+3+4+4+5 = 34)
 // ---------------------------------------------------------------------------
 export const COURSES = [
   hole1,
