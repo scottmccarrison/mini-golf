@@ -263,6 +263,17 @@ export function stepBall(ball, course, dt = DT) {
   let inSand = false;
 
   for (let s = 0; s < substeps; s++) {
+    // --- Step 0: Apply slope forces ---
+    if (course.slopes) {
+      for (const slope of course.slopes) {
+        if (pointInPolygon(ball.x, ball.y, slope.points)) {
+          ball.vx += slope.ax * subDt;
+          ball.vy += slope.ay * subDt;
+          break;
+        }
+      }
+    }
+
     // --- Step 1: Apply velocity ---
     ball.x += ball.vx * subDt;
     ball.y += ball.vy * subDt;

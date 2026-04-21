@@ -143,6 +143,78 @@ function drawCourseFloor(ctx, course) {
 }
 
 // ---------------------------------------------------------------------------
+// Layer: Slopes (gravity zones)
+// ---------------------------------------------------------------------------
+
+function drawSlopes(ctx, course) {
+  if (!course.slopes) return;
+  for (const slope of course.slopes) {
+    if (!slope.points || slope.points.length < 3) continue;
+    const mag = Math.sqrt(slope.ax * slope.ax + slope.ay * slope.ay);
+    if (mag < 1e-6) continue;
+    const dx = slope.ax / mag;
+    const dy = slope.ay / mag;
+
+    ctx.save();
+
+    // Subtle tint of the slope region (brighter where ball will end up)
+    const bx = Math.min(...slope.points.map(p => p.x));
+    const by = Math.min(...slope.points.map(p => p.y));
+    const bw = Math.max(...slope.points.map(p => p.x)) - bx;
+    const bh = Math.max(...slope.points.map(p => p.y)) - by;
+    ctx.beginPath();
+    tracePolygon(ctx, slope.points);
+    const slopeGrad = ctx.createLinearGradient(
+      bx - dx * bw,
+      by - dy * bh,
+      bx + bw + dx * bw,
+      by + bh + dy * bh
+    );
+    slopeGrad.addColorStop(0, 'rgba(255,255,255,0)');
+    slopeGrad.addColorStop(1, 'rgba(255,255,255,0.08)');
+    ctx.fillStyle = slopeGrad;
+    ctx.fill();
+
+    // Clip to slope polygon for arrows
+    ctx.beginPath();
+    tracePolygon(ctx, slope.points);
+    ctx.clip();
+
+    // Arrow grid showing force direction
+    const spacing = 55;
+    const arrowLen = 14;
+    const headLen = 5;
+    const perpX = -dy;
+    const perpY = dx;
+    ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+    ctx.lineWidth = 1.5;
+    ctx.lineCap = 'round';
+    for (let ax = bx; ax < bx + bw + spacing; ax += spacing) {
+      for (let ay = by; ay < by + bh + spacing; ay += spacing) {
+        const cx = ax + (((ay / spacing) | 0) % 2) * (spacing / 2);
+        const cy = ay;
+        const sx = cx - dx * arrowLen / 2;
+        const sy = cy - dy * arrowLen / 2;
+        const ex = cx + dx * arrowLen / 2;
+        const ey = cy + dy * arrowLen / 2;
+        ctx.beginPath();
+        ctx.moveTo(sx, sy);
+        ctx.lineTo(ex, ey);
+        // Arrowhead
+        ctx.lineTo(ex - dx * headLen + perpX * headLen * 0.6,
+                   ey - dy * headLen + perpY * headLen * 0.6);
+        ctx.moveTo(ex, ey);
+        ctx.lineTo(ex - dx * headLen - perpX * headLen * 0.6,
+                   ey - dy * headLen - perpY * headLen * 0.6);
+        ctx.stroke();
+      }
+    }
+
+    ctx.restore();
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Layer: Sand traps
 // ---------------------------------------------------------------------------
 
@@ -1602,6 +1674,9 @@ function drawCourseAndGame(ctx, game, viewport, currentHole, strokes, ball, ball
 
   // 3. Course floor
   drawCourseFloor(ctx, course);
+
+  // 3b. Slopes (below hazards)
+  drawSlopes(ctx, course);
 
   // 4. Sand traps
   drawSandTraps(ctx, course);
