@@ -114,8 +114,11 @@ const hole2 = {
 
 // ---------------------------------------------------------------------------
 // Hole 3: "Z-Path" (Par 6)
-// Giant Z shape: lower-left chamber, middle connector, upper-right chamber.
-// Sand trap guards the middle connector, bumpers in the upper chamber.
+// Giant Z shape:
+//   - Upper chamber (hole side):    x=360..520, y=80..1000
+//   - Middle connector (horizontal): x=80..520,  y=1000..1400
+//   - Lower chamber (tee side):     x=80..240,  y=1400..2360
+// Sand island sits in the middle connector with lanes around all four sides.
 // ---------------------------------------------------------------------------
 const hole3 = {
   name: 'Z-Path',
@@ -125,38 +128,40 @@ const hole3 = {
   holeRadius: 12,
   bounds: BOUNDS,
   walls: [
-    // Upper chamber (hole side)
+    // Top of upper chamber
     { x1: 360, y1: 80,   x2: 520, y2: 80   },
-    { x1: 520, y1: 80,   x2: 520, y2: 1000 },
-    // Bottom of middle connector (right half)
-    { x1: 520, y1: 1000, x2: 240, y2: 1000 },
-    // Right of bottom chamber
-    { x1: 240, y1: 1000, x2: 240, y2: 2360 },
-    // Bottom
+    // Right wall (upper chamber + middle connector, continuous)
+    { x1: 520, y1: 80,   x2: 520, y2: 1400 },
+    // Bottom of middle connector (right portion - gap on left for lower chamber)
+    { x1: 520, y1: 1400, x2: 240, y2: 1400 },
+    // Right wall of lower chamber
+    { x1: 240, y1: 1400, x2: 240, y2: 2360 },
+    // Bottom of lower chamber
     { x1: 240, y1: 2360, x2: 80,  y2: 2360 },
-    // Left of bottom chamber
-    { x1: 80,  y1: 2360, x2: 80,  y2: 1400 },
-    // Top of middle connector (left half)
-    { x1: 80,  y1: 1400, x2: 360, y2: 1400 },
-    // Left of upper chamber
-    { x1: 360, y1: 1400, x2: 360, y2: 80   },
+    // Left wall (lower chamber + middle connector, continuous)
+    { x1: 80,  y1: 2360, x2: 80,  y2: 1000 },
+    // Top of middle connector (left portion - gap on right for upper chamber)
+    { x1: 80,  y1: 1000, x2: 360, y2: 1000 },
+    // Left wall of upper chamber
+    { x1: 360, y1: 1000, x2: 360, y2: 80   },
   ],
   bumpers: [
     { x: 440, y: 400, r: 14, bounciness: 1.3 },
     { x: 420, y: 700, r: 14, bounciness: 1.3 },
   ],
   sandTraps: [
-    // In the middle connector - ball must curve around or pay for it
+    // Sand island in the middle connector - leaves ~110px lanes top/bottom
+    // and ~120px lanes left/right
     {
       points: [
-        { x: 250, y: 1100 },
-        { x: 370, y: 1080 },
-        { x: 420, y: 1150 },
-        { x: 420, y: 1280 },
-        { x: 370, y: 1340 },
-        { x: 250, y: 1330 },
-        { x: 200, y: 1260 },
-        { x: 200, y: 1160 },
+        { x: 260, y: 1130 },
+        { x: 360, y: 1110 },
+        { x: 400, y: 1170 },
+        { x: 400, y: 1230 },
+        { x: 360, y: 1290 },
+        { x: 260, y: 1280 },
+        { x: 220, y: 1240 },
+        { x: 220, y: 1170 },
       ],
     },
   ],
