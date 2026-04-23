@@ -62,6 +62,7 @@ export function closestPointOnSegment(px, py, x1, y1, x2, y2) {
  * Returns boolean.
  */
 export function pointInPolygon(px, py, polygon) {
+  if (!polygon || polygon.length < 3) return false;
   let inside = false;
   const n = polygon.length;
 
@@ -292,10 +293,13 @@ export function stepBall(ball, course, dt = DT) {
     // --- Step 0.6: Magnet pull ---
     if (course.magnets) {
       for (const m of course.magnets) {
+        if (!(m.radius > 0)) continue; // C1: guard against 0, negative, NaN, or undefined radius
         const dx = m.x - ball.x;
         const dy = m.y - ball.y;
         const dist = Math.sqrt(dx*dx + dy*dy);
         if (dist > 0 && dist < m.radius) {
+          const ballSpeed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
+          if (ballSpeed < STOP_SPEED * 2) continue; // H1: don't perpetually re-energize a nearly-stopped ball
           const falloff = 1 - dist / m.radius;
           const ax = (dx / dist) * m.strength * falloff;
           const ay = (dy / dist) * m.strength * falloff;
@@ -319,9 +323,9 @@ export function stepBall(ball, course, dt = DT) {
     // --- Step 2.5: One-way gate collisions ---
     if (course.oneWayGates) {
       for (const gate of course.oneWayGates) {
-        // Only block if ball is moving against the pass direction
+        // Only block if ball is moving against (or tangential to) the pass direction
         const dot = ball.vx * gate.nx + ball.vy * gate.ny;
-        if (dot < 0) {
+        if (dot <= 0) { // H4: was `< 0`; now also blocks tangential motion (dot === 0)
           // Ball moving against pass direction: treat as wall
           checkWallCollision(ball, { x1: gate.x1, y1: gate.y1, x2: gate.x2, y2: gate.y2 });
         }
@@ -409,6 +413,12 @@ export function stepBall(ball, course, dt = DT) {
         const inA = distA < tp.a.r;
         const inB = distB < tp.b.r;
         const lastSide = ball._teleState[i]; // 'a', 'b', or undefined
+        if (inA && inB) {
+          // H3: Ball straddles both pads simultaneously (overlapping pads, design issue).
+          // Freeze state to whichever side was last recorded - don't teleport.
+          ball._teleState[i] = lastSide || undefined;
+          continue;
+        }
         if (inA && lastSide !== 'a') {
           ball.x = tp.b.x;
           ball.y = tp.b.y;

@@ -7,7 +7,7 @@
  */
 
 import { COURSES } from './courses.js';
-import { launchBall, stepBall, MAX_POWER, DT } from './physics.js';
+import { launchBall, stepBall, MAX_POWER, DT, pointInPolygon } from './physics.js';
 
 // ---------------------------------------------------------------------------
 // Factory
@@ -74,6 +74,16 @@ function placeBallAtTee(game, holeIndex) {
   game.ball.y = course.tee.y;
   game.ball.vx = 0;
   game.ball.vy = 0;
+  // H2: Initialize entry-detection state so primitives don't fire on the first
+  // frame just because the tee happens to be inside one.
+  game.ball._padState = (course.speedPads || []).map(pad =>
+    pointInPolygon(course.tee.x, course.tee.y, pad.points)
+  );
+  game.ball._teleState = (course.teleporters || []).map(tp => {
+    const inA = Math.hypot(course.tee.x - tp.a.x, course.tee.y - tp.a.y) < tp.a.r;
+    const inB = Math.hypot(course.tee.x - tp.b.x, course.tee.y - tp.b.y) < tp.b.r;
+    return inA ? 'a' : inB ? 'b' : undefined;
+  });
 }
 
 // ---------------------------------------------------------------------------
