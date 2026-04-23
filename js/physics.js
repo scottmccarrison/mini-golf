@@ -274,6 +274,37 @@ export function stepBall(ball, course, dt = DT) {
       }
     }
 
+    // --- Step 0.5: Speed pad entry trigger ---
+    if (course.speedPads) {
+      if (!ball._padState) ball._padState = [];
+      for (let i = 0; i < course.speedPads.length; i++) {
+        const pad = course.speedPads[i];
+        const inside = pointInPolygon(ball.x, ball.y, pad.points);
+        const wasInside = ball._padState[i] || false;
+        if (inside && !wasInside) {
+          ball.vx += pad.ax;
+          ball.vy += pad.ay;
+        }
+        ball._padState[i] = inside;
+      }
+    }
+
+    // --- Step 0.6: Magnet pull ---
+    if (course.magnets) {
+      for (const m of course.magnets) {
+        const dx = m.x - ball.x;
+        const dy = m.y - ball.y;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        if (dist > 0 && dist < m.radius) {
+          const falloff = 1 - dist / m.radius;
+          const ax = (dx / dist) * m.strength * falloff;
+          const ay = (dy / dist) * m.strength * falloff;
+          ball.vx += ax * subDt;
+          ball.vy += ay * subDt;
+        }
+      }
+    }
+
     // --- Step 1: Apply velocity ---
     ball.x += ball.vx * subDt;
     ball.y += ball.vy * subDt;
@@ -282,6 +313,19 @@ export function stepBall(ball, course, dt = DT) {
     if (course.walls) {
       for (const wall of course.walls) {
         checkWallCollision(ball, wall);
+      }
+    }
+
+    // --- Step 2.5: One-way gate collisions ---
+    if (course.oneWayGates) {
+      for (const gate of course.oneWayGates) {
+        // Only block if ball is moving against the pass direction
+        const dot = ball.vx * gate.nx + ball.vy * gate.ny;
+        if (dot < 0) {
+          // Ball moving against pass direction: treat as wall
+          checkWallCollision(ball, { x1: gate.x1, y1: gate.y1, x2: gate.x2, y2: gate.y2 });
+        }
+        // Otherwise (dot >= 0): ball passes through freely
       }
     }
 
@@ -351,6 +395,30 @@ export function stepBall(ball, course, dt = DT) {
             ball.vx += (pullDx / pullDist) * GRAVITY_PULL * subDt;
             ball.vy += (pullDy / pullDist) * GRAVITY_PULL * subDt;
           }
+        }
+      }
+    }
+
+    // --- Step 8.5: Teleporter check ---
+    if (course.teleporters) {
+      if (!ball._teleState) ball._teleState = [];
+      for (let i = 0; i < course.teleporters.length; i++) {
+        const tp = course.teleporters[i];
+        const distA = Math.sqrt((ball.x - tp.a.x)**2 + (ball.y - tp.a.y)**2);
+        const distB = Math.sqrt((ball.x - tp.b.x)**2 + (ball.y - tp.b.y)**2);
+        const inA = distA < tp.a.r;
+        const inB = distB < tp.b.r;
+        const lastSide = ball._teleState[i]; // 'a', 'b', or undefined
+        if (inA && lastSide !== 'a') {
+          ball.x = tp.b.x;
+          ball.y = tp.b.y;
+          ball._teleState[i] = 'b';
+        } else if (inB && lastSide !== 'b') {
+          ball.x = tp.a.x;
+          ball.y = tp.a.y;
+          ball._teleState[i] = 'a';
+        } else if (!inA && !inB) {
+          ball._teleState[i] = undefined;
         }
       }
     }
