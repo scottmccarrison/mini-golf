@@ -7,7 +7,7 @@
  */
 
 import { COURSES } from './courses.js';
-import { launchBall, stepBall, MAX_POWER, DT } from './physics.js';
+import { launchBall, stepBall, MAX_POWER, DT, pointInPolygon } from './physics.js';
 
 // ---------------------------------------------------------------------------
 // Factory
@@ -48,6 +48,7 @@ export function createGame() {
       holeTransitionPhase: 'out',
       hazardTimer: 0,
       shakeMagnitude: 0,
+      flyoverTime: 0,
     },
     zoom: { level: 1, panX: 0, panY: 0 },
     playerColor: '#4ecdc4',
@@ -73,6 +74,16 @@ function placeBallAtTee(game, holeIndex) {
   game.ball.y = course.tee.y;
   game.ball.vx = 0;
   game.ball.vy = 0;
+  // H2: Initialize entry-detection state so primitives don't fire on the first
+  // frame just because the tee happens to be inside one.
+  game.ball._padState = (course.speedPads || []).map(pad =>
+    pointInPolygon(course.tee.x, course.tee.y, pad.points)
+  );
+  game.ball._teleState = (course.teleporters || []).map(tp => {
+    const inA = Math.hypot(course.tee.x - tp.a.x, course.tee.y - tp.a.y) < tp.a.r;
+    const inB = Math.hypot(course.tee.x - tp.b.x, course.tee.y - tp.b.y) < tp.b.r;
+    return inA ? 'a' : inB ? 'b' : undefined;
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -116,6 +127,10 @@ export function updateGame(game, rawInput, viewport, dt) {
       updateNextHole(game, dt);
       break;
 
+    case 'flyover':
+      updateFlyover(game, rawInput, viewport, dt);
+      break;
+
     case 'gameover':
       updateGameOver(game, rawInput);
       break;
@@ -156,13 +171,13 @@ function updateSpectating(game, rawInput, dt) {
 function updateTitle(game, rawInput) {
   if (rawInput.released || game.titleStart) {
     game.titleStart = false;
-    game.state = 'aiming';
     game.currentHole = 0;
     game.strokes = 0;
     game.scorecard = Array(9).fill(null);
     game.trail = [];
     game._trailStepCount = 0;
     placeBallAtTee(game, 0);
+    startFlyover(game);
   }
 }
 
@@ -290,13 +305,73 @@ function updateNextHole(game, dt) {
     game._trailStepCount = 0;
     placeBallAtTee(game, game.currentHole);
     game.animState.holeTransitionPhase = 'in';
-    // Reset zoom for new hole
+    // Start flyover immediately; fade-in will overlap with the pan
+    startFlyover(game);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// State: flyover (camera pans from hole to tee at start of each hole)
+// ---------------------------------------------------------------------------
+
+const FLYOVER_DURATION = 2.5;
+const FLYOVER_END_ZOOM = 2.0;
+
+export function startFlyover(game) {
+  game.state = 'flyover';
+  game.animState.flyoverTime = 0;
+}
+
+function updateFlyover(game, rawInput, viewport, dt) {
+  const course = COURSES[game.currentHole];
+  if (!course || !viewport || viewport.w === 0) {
+    game.state = 'aiming';
     game.zoom = { level: 1, panX: 0, panY: 0 };
+    return;
   }
 
-  if (game.animState.holeTransition >= 1) {
+  // Continue fade-in animation (drawHoleTransition reads animState.holeTransition)
+  if (game.animState.holeTransition < 1) {
+    game.animState.holeTransition += dt / 2.0;
+  }
+
+  game.animState.flyoverTime += dt;
+  const t = Math.min(1, game.animState.flyoverTime / FLYOVER_DURATION);
+  const ease = t * t * (3 - 2 * t); // smoothstep
+
+  const wx = course.hole.x + (course.tee.x - course.hole.x) * ease;
+  const wy = course.hole.y + (course.tee.y - course.hole.y) * ease;
+  const zoomLevel = 1 + (FLYOVER_END_ZOOM - 1) * ease;
+
+  centerCameraOn(game, wx, wy, zoomLevel, viewport, course);
+
+  if (t >= 1) {
     game.state = 'aiming';
   }
+}
+
+/**
+ * Set game.zoom so that world point (wx, wy) is centered in the viewport
+ * at the given zoom level. Mirrors getCourseTransform in render.js.
+ */
+function centerCameraOn(game, wx, wy, zoomLevel, viewport, course) {
+  const sidePad = 12;
+  const topPad = 54;
+  const botPad = 46;
+  const availW = viewport.w - sidePad * 2;
+  const availH = viewport.h - topPad - botPad;
+  const baseScale = Math.min(
+    availW / course.bounds.width,
+    availH / course.bounds.height
+  );
+  const scale = baseScale * zoomLevel;
+  const sxNoPan = wx * scale + sidePad + (availW - course.bounds.width * scale) / 2;
+  const syNoPan = wy * scale + topPad + (availH - course.bounds.height * scale) / 2;
+  const targetCx = viewport.w / 2;
+  const targetCy = topPad + availH / 2;
+  game.zoom.level = zoomLevel;
+  game.zoom.panX = targetCx - sxNoPan;
+  game.zoom.panY = targetCy - syNoPan;
 }
 
 // ---------------------------------------------------------------------------
@@ -439,14 +514,16 @@ export function applyTurnStart(game, playerId, currentHole, isMyTurn) {
 
   if (isMyTurn) {
     if (holeChanged) {
-      // New hole: reset everything
+      // New hole: reset everything and play flyover
       game.strokes = 0;
       game.trail = [];
       game._trailStepCount = 0;
       placeBallAtTee(game, currentHole);
+      startFlyover(game);
+    } else {
+      // Same hole: keep strokes and ball position (continuing after other player's turn)
+      game.state = 'aiming';
     }
-    // Same hole: keep strokes and ball position (continuing after other player's turn)
-    game.state = 'aiming';
   } else {
     game.state = 'spectating';
     if (holeChanged) {

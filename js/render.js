@@ -143,6 +143,316 @@ function drawCourseFloor(ctx, course) {
 }
 
 // ---------------------------------------------------------------------------
+// Layer: Slopes (gravity zones)
+// ---------------------------------------------------------------------------
+
+function drawSlopes(ctx, course) {
+  if (!course.slopes) return;
+  for (const slope of course.slopes) {
+    if (!slope.points || slope.points.length < 3) continue;
+    const mag = Math.sqrt(slope.ax * slope.ax + slope.ay * slope.ay);
+    if (mag < 1e-6) continue;
+    const dx = slope.ax / mag;
+    const dy = slope.ay / mag;
+
+    ctx.save();
+
+    // Subtle tint of the slope region (brighter where ball will end up)
+    const bx = Math.min(...slope.points.map(p => p.x));
+    const by = Math.min(...slope.points.map(p => p.y));
+    const bw = Math.max(...slope.points.map(p => p.x)) - bx;
+    const bh = Math.max(...slope.points.map(p => p.y)) - by;
+    ctx.beginPath();
+    tracePolygon(ctx, slope.points);
+    const slopeGrad = ctx.createLinearGradient(
+      bx - dx * bw,
+      by - dy * bh,
+      bx + bw + dx * bw,
+      by + bh + dy * bh
+    );
+    slopeGrad.addColorStop(0, 'rgba(255,255,255,0)');
+    slopeGrad.addColorStop(1, 'rgba(255,255,255,0.08)');
+    ctx.fillStyle = slopeGrad;
+    ctx.fill();
+
+    // Clip to slope polygon for arrows
+    ctx.beginPath();
+    tracePolygon(ctx, slope.points);
+    ctx.clip();
+
+    // Arrow grid showing force direction
+    const spacing = 55;
+    const arrowLen = 14;
+    const headLen = 5;
+    const perpX = -dy;
+    const perpY = dx;
+    ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+    ctx.lineWidth = 1.5;
+    ctx.lineCap = 'round';
+    for (let ax = bx; ax < bx + bw + spacing; ax += spacing) {
+      for (let ay = by; ay < by + bh + spacing; ay += spacing) {
+        const cx = ax + (((ay / spacing) | 0) % 2) * (spacing / 2);
+        const cy = ay;
+        const sx = cx - dx * arrowLen / 2;
+        const sy = cy - dy * arrowLen / 2;
+        const ex = cx + dx * arrowLen / 2;
+        const ey = cy + dy * arrowLen / 2;
+        ctx.beginPath();
+        ctx.moveTo(sx, sy);
+        ctx.lineTo(ex, ey);
+        // Arrowhead
+        ctx.lineTo(ex - dx * headLen + perpX * headLen * 0.6,
+                   ey - dy * headLen + perpY * headLen * 0.6);
+        ctx.moveTo(ex, ey);
+        ctx.lineTo(ex - dx * headLen - perpX * headLen * 0.6,
+                   ey - dy * headLen - perpY * headLen * 0.6);
+        ctx.stroke();
+      }
+    }
+
+    ctx.restore();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Layer: Speed pads
+// ---------------------------------------------------------------------------
+
+function drawSpeedPads(ctx, course) {
+  if (!course.speedPads) return;
+  for (const pad of course.speedPads) {
+    if (!pad.points || pad.points.length < 3) continue;
+    const mag = Math.sqrt(pad.ax * pad.ax + pad.ay * pad.ay);
+    if (mag < 1e-6) continue;
+    const dx = pad.ax / mag;
+    const dy = pad.ay / mag;
+
+    ctx.save();
+
+    // Cyan/yellow fill
+    ctx.beginPath();
+    tracePolygon(ctx, pad.points);
+    ctx.fillStyle = 'rgba(80,220,255,0.15)';
+    ctx.fill();
+
+    // Outline
+    ctx.beginPath();
+    tracePolygon(ctx, pad.points);
+    ctx.strokeStyle = 'rgba(80,220,255,0.5)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Clip to pad polygon for arrows
+    ctx.beginPath();
+    tracePolygon(ctx, pad.points);
+    ctx.clip();
+
+    // Arrow grid - denser and bolder than slopes
+    const bx = Math.min(...pad.points.map(p => p.x));
+    const by = Math.min(...pad.points.map(p => p.y));
+    const bw = Math.max(...pad.points.map(p => p.x)) - bx;
+    const bh = Math.max(...pad.points.map(p => p.y)) - by;
+
+    const spacing = 50;
+    const arrowLen = 30;
+    const headLen = 10;
+    const perpX = -dy;
+    const perpY = dx;
+    ctx.strokeStyle = 'rgba(80,220,255,0.75)';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+
+    for (let ax = bx; ax < bx + bw + spacing; ax += spacing) {
+      for (let ay = by; ay < by + bh + spacing; ay += spacing) {
+        const cx = ax + (((ay / spacing) | 0) % 2) * (spacing / 2);
+        const cy = ay;
+        const sx = cx - dx * arrowLen / 2;
+        const sy = cy - dy * arrowLen / 2;
+        const ex = cx + dx * arrowLen / 2;
+        const ey = cy + dy * arrowLen / 2;
+        ctx.beginPath();
+        ctx.moveTo(sx, sy);
+        ctx.lineTo(ex, ey);
+        // Arrowhead
+        ctx.lineTo(ex - dx * headLen + perpX * headLen * 0.6,
+                   ey - dy * headLen + perpY * headLen * 0.6);
+        ctx.moveTo(ex, ey);
+        ctx.lineTo(ex - dx * headLen - perpX * headLen * 0.6,
+                   ey - dy * headLen - perpY * headLen * 0.6);
+        ctx.stroke();
+      }
+    }
+
+    ctx.restore();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Layer: Magnets
+// ---------------------------------------------------------------------------
+
+function drawMagnets(ctx, course) {
+  if (!course.magnets) return;
+  for (const m of course.magnets) {
+    const { x, y, radius } = m;
+
+    ctx.save();
+
+    // Outer to inner concentric rings with fading opacity
+    const ringFractions = [1.0, 0.75, 0.5, 0.25];
+    for (let ri = 0; ri < ringFractions.length; ri++) {
+      const frac = ringFractions[ri];
+      const r = radius * frac;
+      const alpha = 0.15 + (1 - frac) * 0.25;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(180,80,220,${alpha})`;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      // Filled tint for innermost ring
+      if (ri === ringFractions.length - 1) {
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(180,80,220,0.18)';
+        ctx.fill();
+      }
+    }
+
+    // Bright center dot
+    ctx.beginPath();
+    ctx.arc(x, y, 6, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(220,120,255,0.9)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.restore();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Layer: One-way gates
+// ---------------------------------------------------------------------------
+
+function drawOneWayGates(ctx, course) {
+  if (!course.oneWayGates) return;
+  for (const gate of course.oneWayGates) {
+    ctx.save();
+
+    // Gate line
+    ctx.beginPath();
+    ctx.moveTo(gate.x1, gate.y1);
+    ctx.lineTo(gate.x2, gate.y2);
+    ctx.strokeStyle = 'rgb(120,200,120)';
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+
+    // Arrows along the gate in the pass direction
+    const gateLen = Math.sqrt((gate.x2-gate.x1)**2 + (gate.y2-gate.y1)**2);
+    if (gateLen < 1e-6) {
+      ctx.restore();
+      continue;
+    }
+    const gateDirX = (gate.x2 - gate.x1) / gateLen;
+    const gateDirY = (gate.y2 - gate.y1) / gateLen;
+
+    // Draw 2-3 arrows spaced along the gate
+    const numArrows = Math.max(2, Math.floor(gateLen / 40));
+    const arrowLen = 12;
+    const headLen = 5;
+    ctx.strokeStyle = 'rgba(120,220,120,0.9)';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+
+    for (let ai = 1; ai <= numArrows; ai++) {
+      const t = ai / (numArrows + 1);
+      const cx = gate.x1 + gateDirX * gateLen * t;
+      const cy = gate.y1 + gateDirY * gateLen * t;
+      // Arrow in pass direction (nx, ny)
+      const sx = cx - gate.nx * arrowLen / 2;
+      const sy = cy - gate.ny * arrowLen / 2;
+      const ex = cx + gate.nx * arrowLen / 2;
+      const ey = cy + gate.ny * arrowLen / 2;
+      const perpX = -gate.ny;
+      const perpY = gate.nx;
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(ex, ey);
+      ctx.lineTo(ex - gate.nx * headLen + perpX * headLen * 0.6,
+                 ey - gate.ny * headLen + perpY * headLen * 0.6);
+      ctx.moveTo(ex, ey);
+      ctx.lineTo(ex - gate.nx * headLen - perpX * headLen * 0.6,
+                 ey - gate.ny * headLen - perpY * headLen * 0.6);
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Layer: Teleporters
+// ---------------------------------------------------------------------------
+
+const TELEPORTER_PALETTE = [
+  'rgba(255,140,0,',    // orange
+  'rgba(220,60,220,',   // magenta
+  'rgba(80,220,80,',    // lime
+  'rgba(60,180,255,',   // sky-blue
+];
+
+function drawTeleporters(ctx, course) {
+  if (!course.teleporters) return;
+  for (let i = 0; i < course.teleporters.length; i++) {
+    const tp = course.teleporters[i];
+    const colorBase = TELEPORTER_PALETTE[i % TELEPORTER_PALETTE.length];
+
+    ctx.save();
+
+    // Dashed line between the two pads
+    ctx.beginPath();
+    ctx.moveTo(tp.a.x, tp.a.y);
+    ctx.lineTo(tp.b.x, tp.b.y);
+    ctx.setLineDash([8, 10]);
+    ctx.strokeStyle = colorBase + '0.3)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Draw both pads
+    for (const pad of [tp.a, tp.b]) {
+      // Glow halo
+      const glow = ctx.createRadialGradient(pad.x, pad.y, pad.r * 0.5, pad.x, pad.y, pad.r * 2);
+      glow.addColorStop(0, colorBase + '0.35)');
+      glow.addColorStop(1, colorBase + '0)');
+      ctx.beginPath();
+      ctx.arc(pad.x, pad.y, pad.r * 2, 0, Math.PI * 2);
+      ctx.fillStyle = glow;
+      ctx.fill();
+
+      // Filled circle
+      ctx.beginPath();
+      ctx.arc(pad.x, pad.y, pad.r, 0, Math.PI * 2);
+      ctx.fillStyle = colorBase + '0.55)';
+      ctx.fill();
+      ctx.strokeStyle = colorBase + '0.9)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Center dot
+      ctx.beginPath();
+      ctx.arc(pad.x, pad.y, 4, 0, Math.PI * 2);
+      ctx.fillStyle = colorBase + '1)';
+      ctx.fill();
+    }
+
+    ctx.restore();
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Layer: Sand traps
 // ---------------------------------------------------------------------------
 
@@ -1603,6 +1913,15 @@ function drawCourseAndGame(ctx, game, viewport, currentHole, strokes, ball, ball
   // 3. Course floor
   drawCourseFloor(ctx, course);
 
+  // 3b. Slopes (below hazards)
+  drawSlopes(ctx, course);
+
+  // 3c. Speed pads
+  drawSpeedPads(ctx, course);
+
+  // 3d. Magnets
+  drawMagnets(ctx, course);
+
   // 4. Sand traps
   drawSandTraps(ctx, course);
 
@@ -1612,8 +1931,14 @@ function drawCourseAndGame(ctx, game, viewport, currentHole, strokes, ball, ball
   // 6. Walls
   drawWalls(ctx, course);
 
+  // 6b. One-way gates
+  drawOneWayGates(ctx, course);
+
   // 7. Bumpers
   drawBumpers(ctx, course);
+
+  // 7b. Teleporters
+  drawTeleporters(ctx, course);
 
   // 8. Moving obstacles
   drawMovingObstacles(ctx, course, time);

@@ -14,7 +14,7 @@ export const BALL_RADIUS = 6;
 export const HOLE_RADIUS = 16;
 export const SINK_SPEED = 120;      // px/s - ball sinks if slower than this near hole
 export const FRICTION = 0.985;      // velocity multiplier per frame (green)
-export const SAND_FRICTION = 0.94;  // velocity multiplier per frame (sand)
+export const SAND_FRICTION = 0.80;  // velocity multiplier per frame (sand, very punishing)
 export const STOP_SPEED = 5;        // px/s - ball stops below this
 export const MAX_POWER = 1800;      // px/s max initial velocity
 export const BUMPER_BOUNCINESS = 1.3;
@@ -62,6 +62,7 @@ export function closestPointOnSegment(px, py, x1, y1, x2, y2) {
  * Returns boolean.
  */
 export function pointInPolygon(px, py, polygon) {
+  if (!polygon || polygon.length < 3) return false;
   let inside = false;
   const n = polygon.length;
 
@@ -263,6 +264,51 @@ export function stepBall(ball, course, dt = DT) {
   let inSand = false;
 
   for (let s = 0; s < substeps; s++) {
+    // --- Step 0: Apply slope forces ---
+    if (course.slopes) {
+      for (const slope of course.slopes) {
+        if (pointInPolygon(ball.x, ball.y, slope.points)) {
+          ball.vx += slope.ax * subDt;
+          ball.vy += slope.ay * subDt;
+          break;
+        }
+      }
+    }
+
+    // --- Step 0.5: Speed pad entry trigger ---
+    if (course.speedPads) {
+      if (!ball._padState) ball._padState = [];
+      for (let i = 0; i < course.speedPads.length; i++) {
+        const pad = course.speedPads[i];
+        const inside = pointInPolygon(ball.x, ball.y, pad.points);
+        const wasInside = ball._padState[i] || false;
+        if (inside && !wasInside) {
+          ball.vx += pad.ax;
+          ball.vy += pad.ay;
+        }
+        ball._padState[i] = inside;
+      }
+    }
+
+    // --- Step 0.6: Magnet pull ---
+    if (course.magnets) {
+      for (const m of course.magnets) {
+        if (!(m.radius > 0)) continue; // C1: guard against 0, negative, NaN, or undefined radius
+        const dx = m.x - ball.x;
+        const dy = m.y - ball.y;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        if (dist > 0 && dist < m.radius) {
+          const ballSpeed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
+          if (ballSpeed < STOP_SPEED * 2) continue; // H1: don't perpetually re-energize a nearly-stopped ball
+          const falloff = 1 - dist / m.radius;
+          const ax = (dx / dist) * m.strength * falloff;
+          const ay = (dy / dist) * m.strength * falloff;
+          ball.vx += ax * subDt;
+          ball.vy += ay * subDt;
+        }
+      }
+    }
+
     // --- Step 1: Apply velocity ---
     ball.x += ball.vx * subDt;
     ball.y += ball.vy * subDt;
@@ -271,6 +317,19 @@ export function stepBall(ball, course, dt = DT) {
     if (course.walls) {
       for (const wall of course.walls) {
         checkWallCollision(ball, wall);
+      }
+    }
+
+    // --- Step 2.5: One-way gate collisions ---
+    if (course.oneWayGates) {
+      for (const gate of course.oneWayGates) {
+        // Only block if ball is moving against (or tangential to) the pass direction
+        const dot = ball.vx * gate.nx + ball.vy * gate.ny;
+        if (dot <= 0) { // H4: was `< 0`; now also blocks tangential motion (dot === 0)
+          // Ball moving against pass direction: treat as wall
+          checkWallCollision(ball, { x1: gate.x1, y1: gate.y1, x2: gate.x2, y2: gate.y2 });
+        }
+        // Otherwise (dot >= 0): ball passes through freely
       }
     }
 
@@ -295,7 +354,7 @@ export function stepBall(ball, course, dt = DT) {
     inSand = false;
     if (course.sandTraps) {
       for (const trap of course.sandTraps) {
-        if (pointInPolygon(ball.x, ball.y, trap)) {
+        if (pointInPolygon(ball.x, ball.y, trap.points)) {
           inSand = true;
           break;
         }
@@ -305,7 +364,7 @@ export function stepBall(ball, course, dt = DT) {
     // --- Step 6: Water hazard check ---
     if (course.waterHazards) {
       for (const hazard of course.waterHazards) {
-        if (pointInPolygon(ball.x, ball.y, hazard)) {
+        if (pointInPolygon(ball.x, ball.y, hazard.points)) {
           water = true;
           return { ball, sunk: false, water: true, inSand: false };
         }
@@ -340,6 +399,36 @@ export function stepBall(ball, course, dt = DT) {
             ball.vx += (pullDx / pullDist) * GRAVITY_PULL * subDt;
             ball.vy += (pullDy / pullDist) * GRAVITY_PULL * subDt;
           }
+        }
+      }
+    }
+
+    // --- Step 8.5: Teleporter check ---
+    if (course.teleporters) {
+      if (!ball._teleState) ball._teleState = [];
+      for (let i = 0; i < course.teleporters.length; i++) {
+        const tp = course.teleporters[i];
+        const distA = Math.sqrt((ball.x - tp.a.x)**2 + (ball.y - tp.a.y)**2);
+        const distB = Math.sqrt((ball.x - tp.b.x)**2 + (ball.y - tp.b.y)**2);
+        const inA = distA < tp.a.r;
+        const inB = distB < tp.b.r;
+        const lastSide = ball._teleState[i]; // 'a', 'b', or undefined
+        if (inA && inB) {
+          // H3: Ball straddles both pads simultaneously (overlapping pads, design issue).
+          // Freeze state to whichever side was last recorded - don't teleport.
+          ball._teleState[i] = lastSide || undefined;
+          continue;
+        }
+        if (inA && lastSide !== 'a') {
+          ball.x = tp.b.x;
+          ball.y = tp.b.y;
+          ball._teleState[i] = 'b';
+        } else if (inB && lastSide !== 'b') {
+          ball.x = tp.a.x;
+          ball.y = tp.a.y;
+          ball._teleState[i] = 'a';
+        } else if (!inA && !inB) {
+          ball._teleState[i] = undefined;
         }
       }
     }
