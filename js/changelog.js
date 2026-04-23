@@ -1,7 +1,24 @@
 // Changelog entries shown in the feedback modal. Newest first.
-export const LATEST_VERSION = 'v1.3';
+export const LATEST_VERSION = 'v1.4';
 
 export const CHANGELOG = [
+  {
+    version: 'v1.4 - signature holes',
+    items: [
+      'NEW: 4 primitives - speed pads, magnets, one-way gates, teleporters',
+      'NEW: auto-sim tool (tools/sim.mjs) for bot playtest feedback',
+      'REDESIGN: all 9 holes rebuilt with unique outer shapes and one signature element each',
+      'Hole 1 "Slingshot" - magnet in the center, gentle tap enough',
+      'Hole 2 "The Crescent" - kidney-bean shape, bank the outer arc',
+      'Hole 3 "Funnel" - triangle with slopes that guide you home',
+      'Hole 4 "Conveyor" - plus-shape with a one-way speed pad loop',
+      'Hole 5 "Teleport Trio" - U-shape, 3 teleporter pairs offer route choice',
+      'Hole 6 "One-Way Spiral" - square spiral with gates that block backtracking',
+      'Hole 7 "The Roundabout" - orbital octagon with a central magnet',
+      'Hole 8 "Island Hop" - 4 platforms in water, teleporters chain them',
+      'Hole 9 "The Gauntlet" - T-shape finale: speed pads -> gate -> magnet',
+    ],
+  },
   {
     version: 'v1.3 - the long course',
     items: [
