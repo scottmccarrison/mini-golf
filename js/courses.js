@@ -23,7 +23,7 @@
 
 // ---------------------------------------------------------------------------
 // Hole 1: "Slingshot" (Par 2)
-// Signature: Central magnet - gentle tap and let gravity do the work.
+// Signature: Off-axis magnet - tugs a straight putt off the line.
 // Outer shape: octagonal (chamfered rectangle).
 // ---------------------------------------------------------------------------
 const hole1 = {
@@ -58,11 +58,10 @@ const hole1 = {
   slopes: [],
   speedPads: [],
   magnets: [
-    // Magnet centered on the hole with large radius - acts as a magnetic cup.
-    // Any shot that comes within ~300px gets pulled toward the hole.
-    // This makes the hole "easy to find" even with an imperfect aim,
-    // which is the "slingshot" gimmick: gentle tap from tee, let the magnet do the work.
-    { x: 700, y: 300, strength: 600, radius: 300 },
+    // Magnet sits 80px above the hole - a dead-straight putt gets tugged
+    // upward and misses high. Player has to compensate by aiming low or
+    // banking off the bottom wall.
+    { x: 700, y: 220, strength: 500, radius: 220 },
   ],
   oneWayGates: [],
   teleporters: [],
@@ -130,7 +129,9 @@ const hole2 = {
 
 // ---------------------------------------------------------------------------
 // Hole 3: "Funnel" (Par 3)
-// Signature: Triangle with slopes that funnel you toward the apex hole.
+// Signature: Triangle with slopes pushing OUTWARD toward the diagonal walls,
+// where notch baffles deflect the ball. Triangle still narrows so apex is
+// reachable, but you can't just roll straight up the centerline.
 // ---------------------------------------------------------------------------
 const hole3 = {
   name: 'Funnel',
@@ -144,6 +145,16 @@ const hole3 = {
     { x1: 100, y1: 850, x2: 600, y2: 850 },
     { x1: 600, y1: 850, x2: 350, y2: 100 },
     { x1: 350, y1: 100, x2: 100, y2: 850 },
+    // Right-diagonal notch baffles (jut inward from the right wall)
+    { x1: 562, y1: 737, x2: 515, y2: 753 },
+    { x1: 525, y1: 625, x2: 478, y2: 641 },
+    { x1: 488, y1: 512, x2: 440, y2: 528 },
+    { x1: 450, y1: 400, x2: 402, y2: 416 },
+    // Left-diagonal notch baffles (jut inward from the left wall)
+    { x1: 275, y1: 325, x2: 322, y2: 341 },
+    { x1: 238, y1: 437, x2: 285, y2: 453 },
+    { x1: 200, y1: 550, x2: 248, y2: 566 },
+    { x1: 162, y1: 662, x2: 210, y2: 678 },
   ],
   bumpers: [
     { x: 350, y: 500, r: 14, bounciness: 1.3 },
@@ -152,7 +163,7 @@ const hole3 = {
   waterHazards: [],
   movingObstacles: [],
   slopes: [
-    // Left half: push up-right toward center
+    // Left half: push LEFT toward the left diagonal wall (and slightly up)
     {
       points: [
         { x: 100, y: 300 },
@@ -160,10 +171,10 @@ const hole3 = {
         { x: 350, y: 850 },
         { x: 100, y: 850 },
       ],
-      ax: 50,
+      ax: -50,
       ay: -30,
     },
-    // Right half: push up-left toward center
+    // Right half: push RIGHT toward the right diagonal wall (and slightly up)
     {
       points: [
         { x: 350, y: 300 },
@@ -171,7 +182,7 @@ const hole3 = {
         { x: 600, y: 850 },
         { x: 350, y: 850 },
       ],
-      ax: -50,
+      ax: 50,
       ay: -30,
     },
   ],
@@ -183,9 +194,9 @@ const hole3 = {
 
 // ---------------------------------------------------------------------------
 // Hole 4: "Conveyor" (Par 4)
-// Signature: Plus-shaped course with speed pads forming a clockwise loop.
-// Tee is at bottom. Speed pads send ball clockwise: right arm -> up -> top
-// arm -> left. Hole sits at left end of top arm - exit after 3/4 loop.
+// Signature: Plus-shaped course with a diamond island in the junction that
+// deflects the straight tee->hole shot into the side arms, where conveyors
+// take over and route the ball back toward the top arm and hole.
 // ---------------------------------------------------------------------------
 const hole4 = {
   name: 'Conveyor',
@@ -220,6 +231,13 @@ const hole4 = {
     { x1: 550, y1: 650, x2: 550, y2: 870 },
     // Bottom arm right edge
     { x1: 550, y1: 870, x2: 350, y2: 870 },
+    // Diamond island in the center of the junction - large enough that
+    // straight-up shots cannot squeeze past on either side. Forces deflection
+    // into the side arms where conveyors take over.
+    { x1: 450, y1: 410, x2: 540, y2: 500 },
+    { x1: 540, y1: 500, x2: 450, y2: 590 },
+    { x1: 450, y1: 590, x2: 360, y2: 500 },
+    { x1: 360, y1: 500, x2: 450, y2: 410 },
   ],
   bumpers: [],
   sandTraps: [],
@@ -227,7 +245,8 @@ const hole4 = {
   movingObstacles: [],
   slopes: [],
   speedPads: [
-    // Right arm - push up (rescues mis-aimed balls into top arm)
+    // Right arm - push outward (east), launches ball into the dead-end wall
+    // where it bounces back into the junction with new energy
     {
       points: [
         { x: 650, y: 450 },
@@ -235,10 +254,10 @@ const hole4 = {
         { x: 860, y: 550 },
         { x: 650, y: 550 },
       ],
-      ax: 0,
-      ay: -1200,
+      ax: 1200,
+      ay: 0,
     },
-    // Left arm - push down (rescues balls that over-shoot junction)
+    // Left arm - push outward (west), mirrors right arm
     {
       points: [
         { x: 40,  y: 450 },
@@ -246,8 +265,8 @@ const hole4 = {
         { x: 250, y: 550 },
         { x: 40,  y: 550 },
       ],
-      ax: 0,
-      ay: 1200,
+      ax: -1200,
+      ay: 0,
     },
     // Top arm - push toward hole (down-center funnels ball to cup)
     {
