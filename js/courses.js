@@ -287,7 +287,15 @@ const hole4 = {
 
 // ---------------------------------------------------------------------------
 // Hole 5: "Teleport Trio" (Par 4)
-// Signature: U/horseshoe shape with three teleporter pairs for route choice.
+// Signature: Asymmetric U/horseshoe - left arm is wide and open (power side),
+// right arm is narrower with a V-funnel + sand collar near the hole
+// (precision side). Three teleporter pairs are staggered, not mirrored, so
+// each route has a distinct risk/reward profile:
+//   Aqua  - short tee putt, lands mid-connector (still a long way home)
+//   Magenta - medium putt up left arm, drops at top of right arm (must
+//             thread the funnel)
+//   Yellow  - long putt up the full left arm, exits below the funnel right
+//             at the sand collar (earned shortcut)
 // ---------------------------------------------------------------------------
 const hole5 = {
   name: 'Teleport Trio',
@@ -299,12 +307,12 @@ const hole5 = {
   walls: [
     // Left arm outer left
     { x1: 100, y1: 750, x2: 100, y2: 100 },
-    // Top connector outer top
-    { x1: 100, y1: 100, x2: 900, y2: 100 },
-    // Right arm outer right
-    { x1: 900, y1: 100, x2: 900, y2: 750 },
+    // Top connector outer top - shortened to x=860 for asymmetric narrower right side
+    { x1: 100, y1: 100, x2: 860, y2: 100 },
+    // Right arm outer right (narrower than left arm)
+    { x1: 860, y1: 100, x2: 860, y2: 750 },
     // Right arm bottom cap
-    { x1: 900, y1: 750, x2: 700, y2: 750 },
+    { x1: 860, y1: 750, x2: 700, y2: 750 },
     // Right arm inner right up
     { x1: 700, y1: 750, x2: 700, y2: 300 },
     // Top connector inner bottom
@@ -313,6 +321,13 @@ const hole5 = {
     { x1: 300, y1: 300, x2: 300, y2: 750 },
     // Left arm bottom cap
     { x1: 300, y1: 750, x2: 100, y2: 750 },
+    // V-funnel walls in upper right arm. Balls dropping from the connector
+    // (or from magenta's exit at the top of the right arm) must thread the
+    // 60px gap between the wall tips at y=460. Yellow's exit at y=600 is
+    // below the funnel - that route bypasses it entirely as the reward for
+    // the long initial putt.
+    { x1: 700, y1: 380, x2: 755, y2: 460 },
+    { x1: 860, y1: 380, x2: 815, y2: 460 },
   ],
   bumpers: [],
   sandTraps: [],
@@ -323,12 +338,17 @@ const hole5 = {
   magnets: [],
   oneWayGates: [],
   teleporters: [
-    // Low hop - near the tee end
-    { a: { x: 200, y: 600, r: 25 }, b: { x: 800, y: 600, r: 25 } },
-    // Mid hop
-    { a: { x: 200, y: 400, r: 25 }, b: { x: 800, y: 400, r: 25 } },
-    // High hop - near the connector
-    { a: { x: 200, y: 200, r: 25 }, b: { x: 800, y: 200, r: 25 } },
+    // Aqua (intro - tee side): short putt to enter, lands in middle of the
+    // top connector. Still requires connector traversal + dropping through
+    // the V-funnel to finish.
+    { a: { x: 200, y: 600, r: 25 }, b: { x: 500, y: 200, r: 25 } },
+    // Magenta (mid-arm): medium putt up the left arm, drops at the top of
+    // the (narrower) right arm. Must thread the funnel.
+    { a: { x: 200, y: 400, r: 25 }, b: { x: 800, y: 200, r: 25 } },
+    // Yellow (earned shortcut): long putt up the full left arm, exits in
+    // the lower right arm right above the sand collar. Highest risk first
+    // stroke, easiest finish - if you have the touch.
+    { a: { x: 200, y: 200, r: 25 }, b: { x: 800, y: 600, r: 25 } },
   ],
 };
 
