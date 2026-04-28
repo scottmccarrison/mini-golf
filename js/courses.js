@@ -325,9 +325,10 @@ const hole5 = {
     // (or from magenta's exit at the top of the right arm) must thread the
     // 60px gap between the wall tips at y=460. Yellow's exit at y=600 is
     // below the funnel - that route bypasses it entirely as the reward for
-    // the long initial putt.
-    { x1: 700, y1: 380, x2: 755, y2: 460 },
-    { x1: 860, y1: 380, x2: 815, y2: 460 },
+    // the long initial putt. Roots are offset 8px inward from the arm walls
+    // to avoid T-junction double-collision jitter.
+    { x1: 708, y1: 380, x2: 755, y2: 460 },
+    { x1: 852, y1: 380, x2: 815, y2: 460 },
   ],
   bumpers: [],
   sandTraps: [],
