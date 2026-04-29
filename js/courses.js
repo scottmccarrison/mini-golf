@@ -354,57 +354,54 @@ const hole5 = {
 };
 
 // ---------------------------------------------------------------------------
-// Hole 6: "One-Way Spiral" (Par 4)
-// Signature: Square spiral with gates that block backtracking.
-// Path: enter at bottom gap -> clockwise ring 1 -> gap at left -> clockwise
-// ring 2 -> open center -> hole.
+// Hole 6: "The Maze" (Par 5)
+// Signature: Three-section maze introducing one-way gates. Two horizontal
+// dividers split the playfield, each with a one-way gate at a different x
+// position to enforce a zigzag. Internal walls in the middle section carve
+// out a dead-end pocket and force the ball under a partial wall before it
+// can climb to the next gate. A wall in the upper section blocks the
+// straight line to the hole - ball must arc around it.
 // ---------------------------------------------------------------------------
 const hole6 = {
-  name: 'One-Way Spiral',
-  par: 4,
-  tee: { x: 600, y: 650 },
-  hole: { x: 400, y: 400 },
+  name: 'The Maze',
+  par: 5,
+  tee: { x: 100, y: 700 },
+  hole: { x: 700, y: 100 },
   holeRadius: 12,
   bounds: { width: 800, height: 800 },
   walls: [
-    // Outer rectangle
-    { x1: 80,  y1: 80,  x2: 720, y2: 80  },
-    { x1: 720, y1: 80,  x2: 720, y2: 720 },
-    { x1: 720, y1: 720, x2: 80,  y2: 720 },
-    { x1: 80,  y1: 720, x2: 80,  y2: 80  },
+    // Outer perimeter
+    { x1: 40,  y1: 40,  x2: 760, y2: 40  },
+    { x1: 760, y1: 40,  x2: 760, y2: 760 },
+    { x1: 760, y1: 760, x2: 40,  y2: 760 },
+    { x1: 40,  y1: 760, x2: 40,  y2: 40  },
 
-    // Ring 1 inner wall - entry gap at bottom (x=360..440, y=580)
-    // Ball enters gap going UP, then goes clockwise: right side down,
-    // bottom across, up left side, across top, then exits left gap to ring 2.
-    // Left segment of ring 1 bottom (gap at x=360..440)
-    { x1: 160, y1: 580, x2: 360, y2: 580 },
-    // Right segment of ring 1 bottom
-    { x1: 440, y1: 580, x2: 640, y2: 580 },
-    // Ring 1 right side (full)
-    { x1: 640, y1: 580, x2: 640, y2: 160 },
-    // Ring 1 top (full)
-    { x1: 640, y1: 160, x2: 160, y2: 160 },
-    // Ring 1 left side - gap at y=460..540 for exit to ring 2
-    { x1: 160, y1: 160, x2: 160, y2: 460 },
-    // (gap from y=460 to y=540)
-    { x1: 160, y1: 540, x2: 160, y2: 580 },
+    // Lower divider at y=550 - gap at x=180..320 is gate 1 (centered on the
+    // tee->hole diagonal which crosses y=550 at x=250)
+    { x1: 40,  y1: 550, x2: 180, y2: 550 },
+    { x1: 320, y1: 550, x2: 760, y2: 550 },
 
-    // Ring 2 inner wall - ball enters from left gap, goes clockwise inward.
-    // Ring 2 bottom has a gap at x=360..440 so the direct approach can reach
-    // the hole, but the one-way gate blocks retreat.
-    // Ring 2 left side - gap at y=380..460 aligns with ring 1 left gap exit
-    { x1: 240, y1: 240, x2: 240, y2: 380 },
-    // (gap from y=380 to y=460)
-    { x1: 240, y1: 460, x2: 240, y2: 500 },
-    // Ring 2 bottom - left segment (gap at x=360..440 for direct approach)
-    { x1: 240, y1: 500, x2: 360, y2: 500 },
-    // Ring 2 bottom - right segment
-    { x1: 440, y1: 500, x2: 560, y2: 500 },
-    // Ring 2 right side
-    { x1: 560, y1: 500, x2: 560, y2: 240 },
-    // Ring 2 top
-    { x1: 560, y1: 240, x2: 240, y2: 240 },
-    // Center is open - hole at (400,400) is reachable from inside ring 2
+    // Middle divider at y=250 - gap at x=480..620 is gate 2 (offset right
+    // from gate 1 to force a zigzag, but still on the diagonal which crosses
+    // y=250 at x=550)
+    { x1: 40,  y1: 250, x2: 480, y2: 250 },
+    { x1: 620, y1: 250, x2: 760, y2: 250 },
+
+    // Horizontal walls in middle at y=400 with central gap (x=250..550).
+    // Splits the middle section into upper and lower halves; ball must find
+    // the gap to climb toward gate 2.
+    { x1: 40,  y1: 400, x2: 250, y2: 400 },
+    { x1: 550, y1: 400, x2: 760, y2: 400 },
+
+    // Stub wall in upper-middle - creates a dead-end nook on the left that
+    // a ball can wander into, without blocking the central diagonal path.
+    { x1: 250, y1: 400, x2: 250, y2: 320 },
+    { x1: 250, y1: 320, x2: 150, y2: 320 },
+
+    // Vertical wall in upper section - blocks the upper portion of the path
+    // from gate 2 to the hole. Ball can fly under (y > 150) but a high lob
+    // gets blocked.
+    { x1: 600, y1: 40,  x2: 600, y2: 150 },
   ],
   bumpers: [],
   sandTraps: [],
@@ -412,17 +409,12 @@ const hole6 = {
   movingObstacles: [],
   slopes: [],
   speedPads: [],
-  magnets: [
-    // Small pull toward hole to guide ball once it's inside ring 2
-    { x: 400, y: 400, strength: 300, radius: 150 },
-  ],
+  magnets: [],
   oneWayGates: [
-    // Gate at ring 1 bottom entry gap - allow passage upward (into spiral), block retreat
-    { x1: 360, y1: 580, x2: 440, y2: 580, nx: 0, ny: -1 },
-    // Gate at ring 1 left exit gap - allow passage leftward (into ring 2 corridor)
-    { x1: 160, y1: 460, x2: 160, y2: 540, nx: -1, ny: 0 },
-    // Gate at ring 2 bottom gap - allow passage upward (into center), block retreat
-    { x1: 360, y1: 500, x2: 440, y2: 500, nx: 0, ny: -1 },
+    // Gate 1: tee chamber -> middle section. Pass upward only.
+    { x1: 180, y1: 550, x2: 320, y2: 550, nx: 0, ny: -1 },
+    // Gate 2: middle section -> upper section. Pass upward only.
+    { x1: 480, y1: 250, x2: 620, y2: 250, nx: 0, ny: -1 },
   ],
   teleporters: [],
 };
@@ -617,7 +609,7 @@ const hole9 = {
 
 // ---------------------------------------------------------------------------
 // Exported course list
-// Par: 2+3+3+4+4+4+5+5+6 = 36
+// Par: 2+3+3+4+4+5+5+5+6 = 37
 // ---------------------------------------------------------------------------
 export const COURSES = [
   hole1,
