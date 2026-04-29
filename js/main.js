@@ -7,14 +7,39 @@ import { initInput, getInput, resetInput, setEnabled } from './input.js';
 import { render, worldToScreen, screenToWorld } from './render.js';
 import { createGame, updateGame, startMultiplayerGame, applyShot, applyBallUpdate, applyTurnComplete, applyTurnStart, applyHoleComplete, applyGameOver, addChatMessage } from './game.js';
 import { createSession } from './net.js';
+import { fetchLeaderboard, submitScore, recordPersonalBest, getPersonalBests } from './leaderboard.js';
+import { CHANGELOG } from './changelog.js';
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 
 let viewport = { w: 0, h: 0, dpr: 1 };
 let game = createGame();
+
+// Debug: expose game for console inspection. Remove before prod deploy.
+window._dbg = {
+  get game() { return game; },
+  jumpToHole(n) {
+    game.state = 'aiming';
+    game.currentHole = n;
+    game.strokes = 0;
+    game.trail = [];
+    const c = COURSES[n];
+    if (c) { game.ball = { x: c.tee.x, y: c.tee.y, vx: 0, vy: 0 }; }
+    game.zoom = { level: 1, panX: 0, panY: 0 };
+  },
+};
 let lastTime = 0;
 let accumulator = 0;
+
+// ---------------------------------------------------------------------------
+// Leaderboard - fetch on load
+// ---------------------------------------------------------------------------
+
+fetchLeaderboard().then(board => {
+  if (board) game._leaderboard = board;
+});
+game._personalBests = getPersonalBests();
 
 // ---------------------------------------------------------------------------
 // Player name persistence
@@ -25,7 +50,7 @@ const savedName = localStorage.getItem('golf-name') || '';
 nameInput.value = savedName;
 game.playerName = savedName;
 nameInput.addEventListener('input', () => {
-  const name = nameInput.value.slice(0, 4).toUpperCase();
+  const name = nameInput.value.slice(0, 10);
   nameInput.value = name;
   game.playerName = name;
   localStorage.setItem('golf-name', name);
@@ -65,13 +90,13 @@ function resetMpModal() {
   document.getElementById('mp-status').textContent = '\u00a0';
   document.getElementById('mp-code-display').textContent = '';
   document.getElementById('mp-roster').innerHTML = '';
-  document.getElementById('mp-roster-count').textContent = '0/8';
+  document.getElementById('mp-roster-count').textContent = '0';
 }
 
 function renderMpRoster(roster, myId) {
   const container = document.getElementById('mp-roster');
   const countEl = document.getElementById('mp-roster-count');
-  countEl.textContent = `${roster.length}/8`;
+  countEl.textContent = `${roster.length}`;
   container.innerHTML = '';
   for (const player of roster) {
     const row = document.createElement('div');
@@ -198,6 +223,8 @@ function wireSession(sess) {
   });
 
   sess.on('chat', data => {
+    // Skip own messages - already added optimistically in sendChatMessage()
+    if (data.id === sess.id) return;
     addChatMessage(game, data.id, data.name, data.text);
     appendChatMessageToDOM(data.name, data.text, data.id);
     // Flash unread indicator if chat is closed
@@ -277,6 +304,155 @@ document.getElementById('mp-cancel').addEventListener('click', () => {
 // Force uppercase on join code input
 document.getElementById('mp-code-input').addEventListener('input', (e) => {
   e.target.value = e.target.value.toUpperCase();
+});
+
+// ---------------------------------------------------------------------------
+// Leaderboard modal
+// ---------------------------------------------------------------------------
+
+const lbModal = document.getElementById('lb-modal');
+const lbList = document.getElementById('lb-list');
+let lbActiveTab = 'daily';
+
+document.getElementById('btn-lb').addEventListener('click', () => {
+  hideTitleButtons();
+  lbModal.classList.remove('hidden');
+  refreshLbModal();
+});
+
+document.getElementById('lb-close').addEventListener('click', () => {
+  lbModal.classList.add('hidden');
+  showTitleButtons();
+});
+
+// Tab switching
+for (const tab of document.querySelectorAll('.lb-tab')) {
+  tab.addEventListener('click', () => {
+    lbActiveTab = tab.dataset.tab;
+    for (const t of document.querySelectorAll('.lb-tab')) t.classList.remove('active');
+    tab.classList.add('active');
+    renderLbList();
+  });
+}
+
+function refreshLbModal() {
+  // Re-fetch leaderboard when opening
+  fetchLeaderboard().then(board => {
+    if (board) game._leaderboard = board;
+    game._personalBests = getPersonalBests();
+    renderLbList();
+  });
+  renderLbList(); // show cached data immediately
+}
+
+function renderLbList() {
+  const board = game._leaderboard;
+  let entries = [];
+
+  if (lbActiveTab === 'daily') {
+    entries = board ? board.daily : [];
+  } else if (lbActiveTab === 'alltime') {
+    entries = board ? board.alltime : [];
+  } else {
+    entries = (game._personalBests || []).map(e => ({ name: game.playerName || 'You', score: e.score }));
+  }
+
+  if (!entries || entries.length === 0) {
+    lbList.innerHTML = '<div class="lb-empty">No scores yet</div>';
+    return;
+  }
+
+  lbList.innerHTML = entries.slice(0, 10).map((e, i) => `
+    <div class="lb-row">
+      <span class="lb-rank">${i + 1}.</span>
+      <span class="lb-row-name">${escapeHtml(e.name || 'anon')}</span>
+      <span class="lb-row-score">${e.score}</span>
+    </div>
+  `).join('');
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// ---------------------------------------------------------------------------
+// How to Play modal
+// ---------------------------------------------------------------------------
+
+const htpModal = document.getElementById('htp-modal');
+
+document.getElementById('btn-htp').addEventListener('click', () => {
+  hideTitleButtons();
+  htpModal.classList.remove('hidden');
+});
+
+document.getElementById('htp-close').addEventListener('click', () => {
+  htpModal.classList.add('hidden');
+  showTitleButtons();
+});
+
+// ---------------------------------------------------------------------------
+// Feedback / What's New modal
+// ---------------------------------------------------------------------------
+
+const fbModal = document.getElementById('feedback-modal');
+const fbText = document.getElementById('fb-text');
+const fbStatus = document.getElementById('fb-status');
+const fbSend = document.getElementById('fb-send');
+const fbCancel = document.getElementById('fb-cancel');
+const clBody = document.getElementById('changelog-body');
+
+// Render changelog
+function renderChangelog() {
+  if (!clBody) return;
+  clBody.innerHTML = CHANGELOG.map(v => {
+    const items = v.items.map(i => `<li>${escapeHtml(i)}</li>`).join('');
+    return `<div class="cl-version"><div class="cl-ver">${escapeHtml(v.version)}</div><ul>${items}</ul></div>`;
+  }).join('');
+}
+renderChangelog();
+
+function openFeedback() {
+  fbModal.classList.remove('hidden');
+  fbText.value = '';
+  fbStatus.textContent = '';
+  fbSend.disabled = false;
+  fbCancel.disabled = false;
+}
+
+function closeFeedback() {
+  fbModal.classList.add('hidden');
+}
+
+document.getElementById('help-btn').addEventListener('click', openFeedback);
+fbCancel.addEventListener('click', closeFeedback);
+fbModal.addEventListener('click', (e) => { if (e.target === fbModal) closeFeedback(); });
+
+fbSend.addEventListener('click', async () => {
+  const message = fbText.value.trim();
+  if (message.length < 3) {
+    fbStatus.textContent = 'add a few more words first';
+    return;
+  }
+  fbSend.disabled = true;
+  fbCancel.disabled = true;
+  fbStatus.textContent = 'sending...';
+  try {
+    const seg = location.pathname.split('/')[1] || '';
+    const apiBase = (seg === 'golf' || seg === 'golfdev') ? `/${seg}/api` : '/api';
+    const r = await fetch(`${apiBase}/feedback`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ message }),
+    });
+    if (!r.ok) throw new Error('http ' + r.status);
+    fbStatus.textContent = 'thanks! sent.';
+    setTimeout(closeFeedback, 900);
+  } catch (e) {
+    fbStatus.textContent = 'failed to send - try again later';
+    fbSend.disabled = false;
+    fbCancel.disabled = false;
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -463,6 +639,20 @@ function gameLoop(timestamp) {
   } else {
     hideTitleButtons();
     document.body.classList.add('game-active');
+  }
+
+  // Auto-submit score on game over (solo only, once)
+  if (game.state === 'gameover' && !game._scoreSubmitted) {
+    game._scoreSubmitted = true;
+    const totalScore = game.scorecard.reduce((s, v) => s + (v || 0), 0);
+    const totalPar = COURSES.reduce((s, c) => s + c.par, 0);
+    const name = game.playerName || 'anon';
+    if (totalScore > 0) {
+      recordPersonalBest(totalScore);
+      submitScore(name, totalScore, totalPar).then(board => {
+        if (board) game._leaderboard = board;
+      });
+    }
   }
 
   // Show chat toggle only in multiplayer during active game

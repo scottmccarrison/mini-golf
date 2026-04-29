@@ -11,17 +11,59 @@
   <canvas id="game"></canvas>
 
   <div id="top-right">
-    <input id="name-input" type="text" maxlength="4" placeholder="name" autocomplete="off" />
+    <input id="name-input" type="text" maxlength="10" placeholder="name" autocomplete="off" />
     <button id="help-btn" type="button" title="report a bug or suggestion">?</button>
   </div>
 
   <div id="title-buttons">
     <button id="btn-solo" class="title-btn title-btn-primary">Single Player</button>
     <button id="btn-multi" class="title-btn title-btn-secondary">Multiplayer</button>
+    <button id="btn-lb" class="title-btn title-btn-tertiary">Leaderboard</button>
+    <button id="btn-htp" class="title-btn title-btn-tertiary">How to Play</button>
+  </div>
+
+  <div id="htp-modal" class="hidden" role="dialog" aria-modal="true">
+    <div class="htp-card">
+      <div class="htp-title">How to Play</div>
+      <div class="htp-content">
+        <div class="htp-section">
+          <div class="htp-heading">Aim &amp; Shoot</div>
+          <p>Drag from the ball in any direction. The further you pull, the harder the shot. Release to hit.</p>
+        </div>
+        <div class="htp-section">
+          <div class="htp-heading">Zoom &amp; Pan</div>
+          <p>Pinch to zoom in and out on mobile. On desktop, use scroll wheel. Drag the course to pan around.</p>
+        </div>
+        <div class="htp-section">
+          <div class="htp-heading">Scoring</div>
+          <p>Each hole has a par. Fewer strokes is better. Complete all 9 holes to post your score to the leaderboard.</p>
+        </div>
+        <div class="htp-section">
+          <div class="htp-heading">Multiplayer</div>
+          <p>Host a game and share the 4-letter code with friends. Take turns putting. Chat with the message button.</p>
+        </div>
+      </div>
+      <button id="htp-close" class="lb-close-btn">Got it</button>
+    </div>
+  </div>
+
+  <div id="lb-modal" class="hidden" role="dialog" aria-modal="true">
+    <div class="lb-card">
+      <div class="lb-tabs">
+        <button class="lb-tab active" data-tab="daily">Daily</button>
+        <button class="lb-tab" data-tab="alltime">All-Time</button>
+        <button class="lb-tab" data-tab="personal">Personal</button>
+      </div>
+      <div id="lb-list" class="lb-list"></div>
+      <button id="lb-close" class="lb-close-btn">Close</button>
+    </div>
   </div>
 
   <div id="feedback-modal" class="hidden" role="dialog" aria-modal="true">
     <div class="fb-card">
+      <div class="fb-title">what's new</div>
+      <div id="changelog-body"></div>
+      <div class="fb-divider"></div>
       <div class="fb-title">send feedback</div>
       <textarea id="fb-text" maxlength="4000" rows="5" placeholder="bug? idea? what happened?"></textarea>
       <div id="fb-status"></div>

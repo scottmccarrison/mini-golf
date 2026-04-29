@@ -2,6 +2,10 @@
   "name": "mini-golf",
   "version": "0.1.0",
   "private": true,
+  "scripts": {
+    "preview": "python3 -m http.server 8765 --bind 127.0.0.1",
+    "sim": "node tools/sim.mjs"
+  },
   "devDependencies": {
     "wrangler": "^3.0.0"
   }

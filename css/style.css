@@ -42,7 +42,7 @@ html, body {
 }
 
 #name-input {
-  width: 80px;
+  width: 100px;
   padding: 6px 10px;
   border: 2px solid rgba(255, 255, 255, 0.45);
   border-radius: 8px;
@@ -50,7 +50,7 @@ html, body {
   color: #fff;
   font: 14px -apple-system, system-ui, sans-serif;
   text-align: center;
-  text-transform: uppercase;
+  
   outline: none;
   -webkit-user-select: text;
   user-select: text;
@@ -122,40 +122,39 @@ html, body {
 #mp-modal.hidden { display: none; }
 
 .fb-card {
-  background: #fff;
-  border: 2px solid var(--ink);
+  background: rgba(20, 25, 50, 0.95);
+  border: 1px solid rgba(78, 205, 196, 0.25);
+  color: #fff;
   border-radius: 12px;
   padding: 18px;
   width: 100%;
   max-width: 360px;
+  max-height: 80vh;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
-/* Dark theme override for multiplayer modal card */
-#mp-modal .fb-card {
-  background: rgba(20, 25, 50, 0.95);
-  border: 1px solid rgba(78, 205, 196, 0.25);
-  color: #ffffff;
-}
+/* (mp-modal inherits dark fb-card styling) */
 
 .fb-title {
   font: bold 18px -apple-system, system-ui, sans-serif;
+  color: #4ecdc4;
 }
 
 #fb-text {
   width: 100%;
   font: 14px -apple-system, system-ui, sans-serif;
   padding: 10px;
-  border: 2px solid rgba(26, 26, 26, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 8px;
   resize: vertical;
   outline: none;
   -webkit-user-select: text;
   user-select: text;
-  background: #fff;
-  color: var(--ink);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
 }
 
 #fb-text:focus {
@@ -164,7 +163,7 @@ html, body {
 
 #fb-status {
   font: 13px -apple-system, system-ui, sans-serif;
-  color: #666;
+  color: rgba(255, 255, 255, 0.5);
   min-height: 16px;
 }
 
@@ -178,9 +177,9 @@ html, body {
   font: 14px -apple-system, system-ui, sans-serif;
   padding: 8px 14px;
   border-radius: 8px;
-  border: 2px solid rgba(26, 26, 26, 0.45);
-  background: #fff;
-  color: var(--ink);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.7);
   cursor: pointer;
   touch-action: manipulation;
 }
@@ -200,6 +199,43 @@ html, body {
 #fb-cancel:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.fb-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.1);
+  margin: 4px 0;
+}
+
+#changelog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font: 13px -apple-system, system-ui, sans-serif;
+}
+
+.cl-version {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cl-ver {
+  font-weight: 700;
+  color: #f9d423;
+  font-size: 13px;
+}
+
+#changelog-body ul {
+  margin: 0;
+  padding-left: 18px;
+  list-style: disc;
+}
+
+#changelog-body li {
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1.5;
+  font-size: 12px;
 }
 
 /* Multiplayer modal */
@@ -265,7 +301,7 @@ html, body {
   font-family: monospace;
   font-size: 24px;
   text-align: center;
-  text-transform: uppercase;
+  
   letter-spacing: 6px;
   border: 2px solid rgba(78, 205, 196, 0.35);
   border-radius: 8px;
@@ -436,6 +472,207 @@ html, body {
   background: rgba(249, 212, 35, 0.25);
 }
 
+.title-btn-tertiary {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.25);
+  color: rgba(255, 255, 255, 0.65);
+}
+.title-btn-tertiary:hover, .title-btn-tertiary:active {
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.9);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+/* Leaderboard modal */
+#lb-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+#lb-modal.hidden { display: none; }
+
+.lb-card {
+  background: rgba(20, 25, 50, 0.95);
+  border: 1px solid rgba(78, 205, 196, 0.25);
+  color: #fff;
+  border-radius: 12px;
+  padding: 18px;
+  width: 100%;
+  max-width: 360px;
+  max-height: 80vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.lb-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.lb-tab {
+  flex: 1;
+  padding: 10px 0;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: rgba(255, 255, 255, 0.45);
+  font: 13px -apple-system, system-ui, sans-serif;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: color 0.15s;
+}
+
+.lb-tab.active {
+  color: #4ecdc4;
+  border-bottom-color: #4ecdc4;
+  font-weight: 700;
+}
+
+.lb-tab:hover:not(.active) {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.lb-list {
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.lb-row {
+  display: flex;
+  align-items: center;
+  padding: 8px 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  font-size: 14px;
+}
+
+.lb-row:first-child {
+  background: rgba(249, 212, 35, 0.08);
+}
+
+.lb-rank {
+  width: 24px;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 12px;
+}
+
+.lb-row:first-child .lb-rank {
+  color: #f9d423;
+}
+
+.lb-row-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.lb-row:first-child .lb-row-name {
+  color: #f9d423;
+  font-weight: 700;
+}
+
+.lb-row-score {
+  font-weight: 700;
+  color: #fff;
+  margin-left: 12px;
+}
+
+.lb-row:first-child .lb-row-score {
+  color: #f9d423;
+}
+
+.lb-empty {
+  text-align: center;
+  padding: 24px 0;
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 13px;
+}
+
+.lb-close-btn {
+  display: block;
+  width: 100%;
+  padding: 12px;
+  font: 15px -apple-system, system-ui, sans-serif;
+  border-radius: 8px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background 0.15s;
+}
+
+.lb-close-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
+
+/* How to Play modal */
+#htp-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+#htp-modal.hidden { display: none; }
+
+.htp-card {
+  background: rgba(20, 25, 50, 0.95);
+  border: 1px solid rgba(78, 205, 196, 0.25);
+  color: #fff;
+  border-radius: 12px;
+  padding: 18px;
+  width: 100%;
+  max-width: 360px;
+  max-height: 80vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.htp-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #4ecdc4;
+  text-align: center;
+}
+
+.htp-content {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.htp-heading {
+  font-size: 14px;
+  font-weight: 700;
+  color: #f9d423;
+  margin-bottom: 4px;
+}
+
+.htp-section p {
+  font-size: 13px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.75);
+  margin: 0;
+}
+
 /* Multiplayer open button */
 #mp-open-btn {
   width: 32px;
@@ -488,7 +725,7 @@ body.game-active #top-right {
 
 /* iPhone-class narrow screens */
 @media (max-width: 420px) {
-  #name-input { width: 56px; padding: 4px 6px; font-size: 13px; }
+  #name-input { width: 72px; padding: 4px 6px; font-size: 13px; }
 }
 
 /* Very small screens */
@@ -561,7 +798,7 @@ body.game-active #top-right {
 /* Chat panel */
 #chat-panel {
   position: fixed;
-  bottom: 52px;
+  bottom: 98px;
   right: 12px;
   z-index: 16;
   width: 280px;
