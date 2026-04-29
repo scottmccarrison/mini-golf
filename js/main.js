@@ -232,6 +232,18 @@ function wireSession(sess) {
       document.getElementById('chat-toggle').classList.add('has-unread');
     }
   });
+
+  sess.on('ballReset', data => {
+    // Skip own reset - already applied locally
+    if (data.id === sess.id) return;
+    // Apply reset to the remote player's ball
+    if (game.balls && game.balls[data.id]) {
+      game.balls[data.id].x = data.x;
+      game.balls[data.id].y = data.y;
+      game.balls[data.id].vx = 0;
+      game.balls[data.id].vy = 0;
+    }
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -456,6 +468,55 @@ fbSend.addEventListener('click', async () => {
 });
 
 // ---------------------------------------------------------------------------
+// Reset button
+// ---------------------------------------------------------------------------
+
+const resetBtn = document.getElementById('reset-btn');
+
+function doResetBall() {
+  const course = COURSES[game.currentHole];
+  if (!course) return;
+  const tee = course.tee;
+  game.ball.x = tee.x;
+  game.ball.y = tee.y;
+  game.ball.vx = 0;
+  game.ball.vy = 0;
+  game.trail = [];
+  game._trailStepCount = 0;
+  // C2: keep game.balls[myId] in sync with game.ball in MP mode
+  if (game.balls && game.myId != null) {
+    game.balls[game.myId] = { x: tee.x, y: tee.y, vx: 0, vy: 0 };
+  }
+  // H3: clear animation timers so hazard/sink can't overwrite the reset position
+  game.animState.sinkTimer = 0;
+  game.animState.hazardTimer = 0;
+  game.animState.shakeMagnitude = 0;
+  // M3: update lastBallPos so hazard recovery restores to the tee, not the old position
+  game.lastBallPos = { x: tee.x, y: tee.y };
+  // Cancel any active aim gesture
+  resetInput();
+}
+
+resetBtn.addEventListener('click', () => {
+  if (resetBtn.disabled) return;
+
+  if (game.mode === 'mp') {
+    // MP: only allowed when it's our turn and the ball is at rest
+    const isMyTurn = game.currentTurnPlayerId === (session && session.id);
+    const atRest = game.ball.vx === 0 && game.ball.vy === 0;
+    if (!isMyTurn || !atRest) return;
+    const course = COURSES[game.currentHole];
+    if (course) {
+      doResetBall();
+      session.sendReset(course.tee.x, course.tee.y);
+    }
+  } else {
+    // Solo: always allowed during play
+    doResetBall();
+  }
+});
+
+// ---------------------------------------------------------------------------
 // Chat UI
 // ---------------------------------------------------------------------------
 
@@ -663,6 +724,24 @@ function gameLoop(timestamp) {
     chatToggleEl.classList.add('hidden');
     chatPanel.classList.add('hidden');
     chatOpen = false;
+  }
+
+  // Show reset button only when the ball is at rest and the player can act.
+  // Blocked during animations/transitions: sunk, nextHole, flyover, hazard, rolling.
+  const activePlay = game.state === 'aiming';
+  if (activePlay) {
+    resetBtn.classList.remove('hidden');
+    if (game.mode === 'mp') {
+      // MP: enabled only on our turn while ball is at rest
+      const isMyTurn = game.currentTurnPlayerId === (session && session.id);
+      const atRest = game.ball.vx === 0 && game.ball.vy === 0;
+      resetBtn.disabled = !(isMyTurn && atRest);
+    } else {
+      resetBtn.disabled = false;
+    }
+  } else {
+    resetBtn.classList.add('hidden');
+    resetBtn.disabled = true;
   }
 
   // Render current frame

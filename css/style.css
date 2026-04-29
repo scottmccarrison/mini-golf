@@ -756,6 +756,41 @@ body.game-active #top-right {
   /* Score ticker hole numbers use smaller font - handled in canvas but we can guide via CSS var */
 }
 
+/* Reset button */
+#reset-btn {
+  position: fixed;
+  bottom: 100px;
+  right: 12px;
+  z-index: 15;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  font-size: 20px;
+  cursor: pointer;
+  touch-action: manipulation;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, opacity 0.15s;
+  opacity: 0.7;
+}
+
+#reset-btn:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.7);
+  border-color: rgba(255, 255, 255, 0.5);
+  opacity: 1;
+}
+
+#reset-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+#reset-btn.hidden { display: none; }
+
 /* Chat toggle button */
 #chat-toggle {
   position: fixed;

@@ -124,6 +124,9 @@ export function createSession() {
         case 'chat':
           emit('chat', data);
           break;
+        case 'ballReset':
+          emit('ballReset', data);
+          break;
       }
     });
     ws.addEventListener('error', e => emit('error', e));
@@ -174,6 +177,11 @@ export function createSession() {
     sendChat(text) {
       if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: 'chat', text }));
+      }
+    },
+    sendReset(x, y) {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'ballReset', x, y }));
       }
     },
     close() {

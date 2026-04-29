@@ -216,6 +216,20 @@ export class Room {
         break;
       }
 
+      case 'ballReset': {
+        // Only the active turn player can reset their ball
+        const activeTurnId = this._turnOrder[this._currentTurnIndex];
+        if (meta.id !== activeTurnId) break;
+        if (typeof data.x !== 'number' || typeof data.y !== 'number') break;
+        this._broadcastExcept(meta.id, {
+          type: 'ballReset',
+          id: meta.id,
+          x: data.x,
+          y: data.y,
+        });
+        break;
+      }
+
       case 'turnComplete': {
         if (typeof data.strokes !== 'number') break;
         const sunk = !!data.sunk;
