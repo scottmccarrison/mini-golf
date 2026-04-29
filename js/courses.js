@@ -287,7 +287,15 @@ const hole4 = {
 
 // ---------------------------------------------------------------------------
 // Hole 5: "Teleport Trio" (Par 4)
-// Signature: U/horseshoe shape with three teleporter pairs for route choice.
+// Signature: Asymmetric U/horseshoe - left arm is wide and open (power side),
+// right arm is narrower with a V-funnel + sand collar near the hole
+// (precision side). Three teleporter pairs are staggered, not mirrored, so
+// each route has a distinct risk/reward profile:
+//   Aqua  - short tee putt, lands mid-connector (still a long way home)
+//   Magenta - medium putt up left arm, drops at top of right arm (must
+//             thread the funnel)
+//   Yellow  - long putt up the full left arm, exits below the funnel right
+//             at the sand collar (earned shortcut)
 // ---------------------------------------------------------------------------
 const hole5 = {
   name: 'Teleport Trio',
@@ -299,12 +307,12 @@ const hole5 = {
   walls: [
     // Left arm outer left
     { x1: 100, y1: 750, x2: 100, y2: 100 },
-    // Top connector outer top
-    { x1: 100, y1: 100, x2: 900, y2: 100 },
-    // Right arm outer right
-    { x1: 900, y1: 100, x2: 900, y2: 750 },
+    // Top connector outer top - shortened to x=860 for asymmetric narrower right side
+    { x1: 100, y1: 100, x2: 860, y2: 100 },
+    // Right arm outer right (narrower than left arm)
+    { x1: 860, y1: 100, x2: 860, y2: 750 },
     // Right arm bottom cap
-    { x1: 900, y1: 750, x2: 700, y2: 750 },
+    { x1: 860, y1: 750, x2: 700, y2: 750 },
     // Right arm inner right up
     { x1: 700, y1: 750, x2: 700, y2: 300 },
     // Top connector inner bottom
@@ -313,6 +321,14 @@ const hole5 = {
     { x1: 300, y1: 300, x2: 300, y2: 750 },
     // Left arm bottom cap
     { x1: 300, y1: 750, x2: 100, y2: 750 },
+    // V-funnel walls in upper right arm. Balls dropping from the connector
+    // (or from magenta's exit at the top of the right arm) must thread the
+    // 60px gap between the wall tips at y=460. Yellow's exit at y=600 is
+    // below the funnel - that route bypasses it entirely as the reward for
+    // the long initial putt. Roots are offset 8px inward from the arm walls
+    // to avoid T-junction double-collision jitter.
+    { x1: 708, y1: 380, x2: 755, y2: 460 },
+    { x1: 852, y1: 380, x2: 815, y2: 460 },
   ],
   bumpers: [],
   sandTraps: [],
@@ -323,67 +339,71 @@ const hole5 = {
   magnets: [],
   oneWayGates: [],
   teleporters: [
-    // Low hop - near the tee end
-    { a: { x: 200, y: 600, r: 25 }, b: { x: 800, y: 600, r: 25 } },
-    // Mid hop
-    { a: { x: 200, y: 400, r: 25 }, b: { x: 800, y: 400, r: 25 } },
-    // High hop - near the connector
-    { a: { x: 200, y: 200, r: 25 }, b: { x: 800, y: 200, r: 25 } },
+    // Aqua (intro - tee side): short putt to enter, lands in middle of the
+    // top connector. Still requires connector traversal + dropping through
+    // the V-funnel to finish.
+    { a: { x: 200, y: 600, r: 25 }, b: { x: 500, y: 200, r: 25 } },
+    // Magenta (mid-arm): medium putt up the left arm, drops at the top of
+    // the (narrower) right arm. Must thread the funnel.
+    { a: { x: 200, y: 400, r: 25 }, b: { x: 800, y: 200, r: 25 } },
+    // Yellow (earned shortcut): long putt up the full left arm, exits in
+    // the lower right arm right above the sand collar. Highest risk first
+    // stroke, easiest finish - if you have the touch.
+    { a: { x: 200, y: 200, r: 25 }, b: { x: 800, y: 600, r: 25 } },
   ],
 };
 
 // ---------------------------------------------------------------------------
-// Hole 6: "One-Way Spiral" (Par 4)
-// Signature: Square spiral with gates that block backtracking.
-// Path: enter at bottom gap -> clockwise ring 1 -> gap at left -> clockwise
-// ring 2 -> open center -> hole.
+// Hole 6: "The Maze" (Par 5)
+// Signature: Three-section maze introducing one-way gates. Two horizontal
+// dividers split the playfield, each with a one-way gate at a different x
+// position to enforce a zigzag. Internal walls in the middle section carve
+// out a dead-end pocket and force the ball under a partial wall before it
+// can climb to the next gate. A wall in the upper section blocks the
+// straight line to the hole - ball must arc around it.
 // ---------------------------------------------------------------------------
 const hole6 = {
-  name: 'One-Way Spiral',
-  par: 4,
-  tee: { x: 600, y: 650 },
-  hole: { x: 400, y: 400 },
+  name: 'The Maze',
+  par: 5,
+  tee: { x: 100, y: 700 },
+  hole: { x: 700, y: 100 },
   holeRadius: 12,
   bounds: { width: 800, height: 800 },
   walls: [
-    // Outer rectangle
-    { x1: 80,  y1: 80,  x2: 720, y2: 80  },
-    { x1: 720, y1: 80,  x2: 720, y2: 720 },
-    { x1: 720, y1: 720, x2: 80,  y2: 720 },
-    { x1: 80,  y1: 720, x2: 80,  y2: 80  },
+    // Outer perimeter
+    { x1: 40,  y1: 40,  x2: 760, y2: 40  },
+    { x1: 760, y1: 40,  x2: 760, y2: 760 },
+    { x1: 760, y1: 760, x2: 40,  y2: 760 },
+    { x1: 40,  y1: 760, x2: 40,  y2: 40  },
 
-    // Ring 1 inner wall - entry gap at bottom (x=360..440, y=580)
-    // Ball enters gap going UP, then goes clockwise: right side down,
-    // bottom across, up left side, across top, then exits left gap to ring 2.
-    // Left segment of ring 1 bottom (gap at x=360..440)
-    { x1: 160, y1: 580, x2: 360, y2: 580 },
-    // Right segment of ring 1 bottom
-    { x1: 440, y1: 580, x2: 640, y2: 580 },
-    // Ring 1 right side (full)
-    { x1: 640, y1: 580, x2: 640, y2: 160 },
-    // Ring 1 top (full)
-    { x1: 640, y1: 160, x2: 160, y2: 160 },
-    // Ring 1 left side - gap at y=460..540 for exit to ring 2
-    { x1: 160, y1: 160, x2: 160, y2: 460 },
-    // (gap from y=460 to y=540)
-    { x1: 160, y1: 540, x2: 160, y2: 580 },
+    // Lower divider at y=550 - gap at x=180..320 is gate 1 (centered on the
+    // tee->hole diagonal which crosses y=550 at x=250)
+    { x1: 40,  y1: 550, x2: 180, y2: 550 },
+    { x1: 320, y1: 550, x2: 760, y2: 550 },
 
-    // Ring 2 inner wall - ball enters from left gap, goes clockwise inward.
-    // Ring 2 bottom has a gap at x=360..440 so the direct approach can reach
-    // the hole, but the one-way gate blocks retreat.
-    // Ring 2 left side - gap at y=380..460 aligns with ring 1 left gap exit
-    { x1: 240, y1: 240, x2: 240, y2: 380 },
-    // (gap from y=380 to y=460)
-    { x1: 240, y1: 460, x2: 240, y2: 500 },
-    // Ring 2 bottom - left segment (gap at x=360..440 for direct approach)
-    { x1: 240, y1: 500, x2: 360, y2: 500 },
-    // Ring 2 bottom - right segment
-    { x1: 440, y1: 500, x2: 560, y2: 500 },
-    // Ring 2 right side
-    { x1: 560, y1: 500, x2: 560, y2: 240 },
-    // Ring 2 top
-    { x1: 560, y1: 240, x2: 240, y2: 240 },
-    // Center is open - hole at (400,400) is reachable from inside ring 2
+    // Middle divider at y=250 - gap at x=480..620 is gate 2 (offset right
+    // from gate 1 to force a zigzag, but still on the diagonal which crosses
+    // y=250 at x=550)
+    { x1: 40,  y1: 250, x2: 480, y2: 250 },
+    { x1: 620, y1: 250, x2: 760, y2: 250 },
+
+    // Horizontal walls in middle at y=400. Two gaps: x=150..200 (entry to
+    // the dead-end pocket above) and x=250..550 (the central path through).
+    { x1: 40,  y1: 400, x2: 150, y2: 400 },
+    { x1: 200, y1: 400, x2: 250, y2: 400 },
+    { x1: 550, y1: 400, x2: 760, y2: 400 },
+
+    // Dead-end pocket above the y=400 wall, x=150..250, y=320..400. Single
+    // entry from below through the 50px gap at x=150..200, y=400. A ball
+    // that wanders in has to back out the same way - wasted stroke.
+    { x1: 250, y1: 400, x2: 250, y2: 320 },  // right wall
+    { x1: 250, y1: 320, x2: 150, y2: 320 },  // top wall
+    { x1: 150, y1: 320, x2: 150, y2: 400 },  // left wall (closes the pocket)
+
+    // Vertical wall in upper section - blocks the upper portion of the path
+    // from gate 2 to the hole. Ball can fly under (y > 150) but a high lob
+    // gets blocked.
+    { x1: 600, y1: 40,  x2: 600, y2: 150 },
   ],
   bumpers: [],
   sandTraps: [],
@@ -391,17 +411,12 @@ const hole6 = {
   movingObstacles: [],
   slopes: [],
   speedPads: [],
-  magnets: [
-    // Small pull toward hole to guide ball once it's inside ring 2
-    { x: 400, y: 400, strength: 300, radius: 150 },
-  ],
+  magnets: [],
   oneWayGates: [
-    // Gate at ring 1 bottom entry gap - allow passage upward (into spiral), block retreat
-    { x1: 360, y1: 580, x2: 440, y2: 580, nx: 0, ny: -1 },
-    // Gate at ring 1 left exit gap - allow passage leftward (into ring 2 corridor)
-    { x1: 160, y1: 460, x2: 160, y2: 540, nx: -1, ny: 0 },
-    // Gate at ring 2 bottom gap - allow passage upward (into center), block retreat
-    { x1: 360, y1: 500, x2: 440, y2: 500, nx: 0, ny: -1 },
+    // Gate 1: tee chamber -> middle section. Pass upward only.
+    { x1: 180, y1: 550, x2: 320, y2: 550, nx: 0, ny: -1 },
+    // Gate 2: middle section -> upper section. Pass upward only.
+    { x1: 480, y1: 250, x2: 620, y2: 250, nx: 0, ny: -1 },
   ],
   teleporters: [],
 };
@@ -596,7 +611,7 @@ const hole9 = {
 
 // ---------------------------------------------------------------------------
 // Exported course list
-// Par: 2+3+3+4+4+4+5+5+6 = 36
+// Par: 2+3+3+4+4+5+5+5+6 = 37
 // ---------------------------------------------------------------------------
 export const COURSES = [
   hole1,
