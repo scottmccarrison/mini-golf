@@ -232,6 +232,18 @@ function wireSession(sess) {
       document.getElementById('chat-toggle').classList.add('has-unread');
     }
   });
+
+  sess.on('ballReset', data => {
+    // Skip own reset - already applied locally
+    if (data.id === sess.id) return;
+    // Apply reset to the remote player's ball
+    if (game.balls && game.balls[data.id]) {
+      game.balls[data.id].x = data.x;
+      game.balls[data.id].y = data.y;
+      game.balls[data.id].vx = 0;
+      game.balls[data.id].vy = 0;
+    }
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -456,6 +468,44 @@ fbSend.addEventListener('click', async () => {
 });
 
 // ---------------------------------------------------------------------------
+// Reset button
+// ---------------------------------------------------------------------------
+
+const resetBtn = document.getElementById('reset-btn');
+
+function doResetBall() {
+  const course = COURSES[game.currentHole];
+  if (!course) return;
+  game.ball.x = course.tee.x;
+  game.ball.y = course.tee.y;
+  game.ball.vx = 0;
+  game.ball.vy = 0;
+  game.trail = [];
+  game._trailStepCount = 0;
+  // Cancel any active aim gesture
+  resetInput();
+}
+
+resetBtn.addEventListener('click', () => {
+  if (resetBtn.disabled) return;
+
+  if (game.mode === 'mp') {
+    // MP: only allowed when it's our turn and the ball is at rest
+    const isMyTurn = game.currentTurnPlayerId === (session && session.id);
+    const atRest = game.ball.vx === 0 && game.ball.vy === 0;
+    if (!isMyTurn || !atRest) return;
+    const course = COURSES[game.currentHole];
+    if (course) {
+      doResetBall();
+      session.sendReset(course.tee.x, course.tee.y);
+    }
+  } else {
+    // Solo: always allowed during play
+    doResetBall();
+  }
+});
+
+// ---------------------------------------------------------------------------
 // Chat UI
 // ---------------------------------------------------------------------------
 
@@ -663,6 +713,23 @@ function gameLoop(timestamp) {
     chatToggleEl.classList.add('hidden');
     chatPanel.classList.add('hidden');
     chatOpen = false;
+  }
+
+  // Show reset button during active play (not on title or gameover)
+  const activePlay = game.state !== 'title' && game.state !== 'gameover';
+  if (activePlay) {
+    resetBtn.classList.remove('hidden');
+    if (game.mode === 'mp') {
+      // MP: enabled only on our turn while ball is at rest
+      const isMyTurn = game.currentTurnPlayerId === (session && session.id);
+      const atRest = game.ball.vx === 0 && game.ball.vy === 0;
+      resetBtn.disabled = !(isMyTurn && atRest);
+    } else {
+      resetBtn.disabled = false;
+    }
+  } else {
+    resetBtn.classList.add('hidden');
+    resetBtn.disabled = true;
   }
 
   // Render current frame
