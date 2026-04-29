@@ -395,9 +395,9 @@ const hole6 = {
     { x1: 120, y1: 700, x2: 320, y2: 700 },  // bottom
 
     // Trap pocket B (lower-mid): 3-walled box, top is a one-way gate
-    { x1: 380, y1: 540, x2: 380, y2: 700 },  // left wall
+    { x1: 440, y1: 540, x2: 440, y2: 700 },  // left wall
     { x1: 600, y1: 540, x2: 600, y2: 700 },  // right wall
-    { x1: 380, y1: 700, x2: 600, y2: 700 },  // bottom
+    { x1: 440, y1: 700, x2: 600, y2: 700 },  // bottom
   ],
   bumpers: [],
   sandTraps: [],
@@ -410,7 +410,7 @@ const hole6 = {
     // Trap A entrance - allows downward entry only (ball falls in, stuck)
     { x1: 120, y1: 540, x2: 320, y2: 540, nx: 0, ny: 1 },
     // Trap B entrance - same
-    { x1: 380, y1: 540, x2: 600, y2: 540, nx: 0, ny: 1 },
+    { x1: 440, y1: 540, x2: 600, y2: 540, nx: 0, ny: 1 },
   ],
   teleporters: [],
 };
