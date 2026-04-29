@@ -476,12 +476,23 @@ const resetBtn = document.getElementById('reset-btn');
 function doResetBall() {
   const course = COURSES[game.currentHole];
   if (!course) return;
-  game.ball.x = course.tee.x;
-  game.ball.y = course.tee.y;
+  const tee = course.tee;
+  game.ball.x = tee.x;
+  game.ball.y = tee.y;
   game.ball.vx = 0;
   game.ball.vy = 0;
   game.trail = [];
   game._trailStepCount = 0;
+  // C2: keep game.balls[myId] in sync with game.ball in MP mode
+  if (game.balls && game.myId != null) {
+    game.balls[game.myId] = { x: tee.x, y: tee.y, vx: 0, vy: 0 };
+  }
+  // H3: clear animation timers so hazard/sink can't overwrite the reset position
+  game.animState.sinkTimer = 0;
+  game.animState.hazardTimer = 0;
+  game.animState.shakeMagnitude = 0;
+  // M3: update lastBallPos so hazard recovery restores to the tee, not the old position
+  game.lastBallPos = { x: tee.x, y: tee.y };
   // Cancel any active aim gesture
   resetInput();
 }
@@ -715,8 +726,9 @@ function gameLoop(timestamp) {
     chatOpen = false;
   }
 
-  // Show reset button during active play (not on title or gameover)
-  const activePlay = game.state !== 'title' && game.state !== 'gameover';
+  // Show reset button only when the ball is at rest and the player can act.
+  // Blocked during animations/transitions: sunk, nextHole, flyover, hazard, rolling.
+  const activePlay = game.state === 'aiming';
   if (activePlay) {
     resetBtn.classList.remove('hidden');
     if (game.mode === 'mp') {
