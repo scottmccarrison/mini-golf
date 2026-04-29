@@ -355,18 +355,18 @@ const hole5 = {
 
 // ---------------------------------------------------------------------------
 // Hole 6: "The Maze" (Par 5)
-// Signature: Three-section maze introducing one-way gates. Two horizontal
-// dividers split the playfield, each with a one-way gate at a different x
-// position to enforce a zigzag. Internal walls in the middle section carve
-// out a dead-end pocket and force the ball under a partial wall before it
-// can climb to the next gate. A wall in the upper section blocks the
-// straight line to the hole - ball must arc around it.
+// Signature: Inspired by a kids coloring-book maze. Tee at upper-left, hole
+// at bottom-right. Player must navigate around a closed-box arch in the
+// upper section, thread a 120px gap in the middle divider, then find the
+// 60px channel between two trap pockets in the lower section. Each trap
+// pocket has a one-way gate at the top that allows downward entry but
+// blocks upward escape - if the ball lands inside, the player resets.
 // ---------------------------------------------------------------------------
 const hole6 = {
   name: 'The Maze',
   par: 5,
-  tee: { x: 100, y: 700 },
-  hole: { x: 700, y: 100 },
+  tee: { x: 200, y: 100 },
+  hole: { x: 700, y: 720 },
   holeRadius: 12,
   bounds: { width: 800, height: 800 },
   walls: [
@@ -376,34 +376,28 @@ const hole6 = {
     { x1: 760, y1: 760, x2: 40,  y2: 760 },
     { x1: 40,  y1: 760, x2: 40,  y2: 40  },
 
-    // Lower divider at y=550 - gap at x=180..320 is gate 1 (centered on the
-    // tee->hole diagonal which crosses y=550 at x=250)
-    { x1: 40,  y1: 550, x2: 180, y2: 550 },
-    { x1: 320, y1: 550, x2: 760, y2: 550 },
+    // Closed-box arch hanging from the top wall in the upper section.
+    // An obstacle - ball must go around either side.
+    { x1: 320, y1: 40,  x2: 320, y2: 240 },  // left leg
+    { x1: 440, y1: 40,  x2: 440, y2: 240 },  // right leg
+    { x1: 320, y1: 240, x2: 440, y2: 240 },  // bottom of arch
 
-    // Middle divider at y=250 - gap at x=480..620 is gate 2 (offset right
-    // from gate 1 to force a zigzag, but still on the diagonal which crosses
-    // y=250 at x=550)
-    { x1: 40,  y1: 250, x2: 480, y2: 250 },
-    { x1: 620, y1: 250, x2: 760, y2: 250 },
+    // Right stub from right wall - narrows the upper-right corridor
+    { x1: 600, y1: 200, x2: 760, y2: 200 },
 
-    // Horizontal walls in middle at y=400. Two gaps: x=150..200 (entry to
-    // the dead-end pocket above) and x=250..550 (the central path through).
-    { x1: 40,  y1: 400, x2: 150, y2: 400 },
-    { x1: 200, y1: 400, x2: 250, y2: 400 },
-    { x1: 550, y1: 400, x2: 760, y2: 400 },
+    // Middle divider with central gap (x=320..440, 120px wide)
+    { x1: 40,  y1: 420, x2: 320, y2: 420 },
+    { x1: 440, y1: 420, x2: 760, y2: 420 },
 
-    // Dead-end pocket above the y=400 wall, x=150..250, y=320..400. Single
-    // entry from below through the 50px gap at x=150..200, y=400. A ball
-    // that wanders in has to back out the same way - wasted stroke.
-    { x1: 250, y1: 400, x2: 250, y2: 320 },  // right wall
-    { x1: 250, y1: 320, x2: 150, y2: 320 },  // top wall
-    { x1: 150, y1: 320, x2: 150, y2: 400 },  // left wall (closes the pocket)
+    // Trap pocket A (lower-left): 3-walled box, top is a one-way gate
+    { x1: 120, y1: 540, x2: 120, y2: 700 },  // left wall
+    { x1: 320, y1: 540, x2: 320, y2: 700 },  // right wall
+    { x1: 120, y1: 700, x2: 320, y2: 700 },  // bottom
 
-    // Vertical wall in upper section - blocks the upper portion of the path
-    // from gate 2 to the hole. Ball can fly under (y > 150) but a high lob
-    // gets blocked.
-    { x1: 600, y1: 40,  x2: 600, y2: 150 },
+    // Trap pocket B (lower-mid): 3-walled box, top is a one-way gate
+    { x1: 440, y1: 540, x2: 440, y2: 700 },  // left wall
+    { x1: 600, y1: 540, x2: 600, y2: 700 },  // right wall
+    { x1: 440, y1: 700, x2: 600, y2: 700 },  // bottom
   ],
   bumpers: [],
   sandTraps: [],
@@ -413,10 +407,10 @@ const hole6 = {
   speedPads: [],
   magnets: [],
   oneWayGates: [
-    // Gate 1: tee chamber -> middle section. Pass upward only.
-    { x1: 180, y1: 550, x2: 320, y2: 550, nx: 0, ny: -1 },
-    // Gate 2: middle section -> upper section. Pass upward only.
-    { x1: 480, y1: 250, x2: 620, y2: 250, nx: 0, ny: -1 },
+    // Trap A entrance - allows downward entry only (ball falls in, stuck)
+    { x1: 120, y1: 540, x2: 320, y2: 540, nx: 0, ny: 1 },
+    // Trap B entrance - same
+    { x1: 440, y1: 540, x2: 600, y2: 540, nx: 0, ny: 1 },
   ],
   teleporters: [],
 };
