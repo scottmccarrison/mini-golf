@@ -387,16 +387,18 @@ const hole6 = {
     { x1: 40,  y1: 250, x2: 480, y2: 250 },
     { x1: 620, y1: 250, x2: 760, y2: 250 },
 
-    // Horizontal walls in middle at y=400 with central gap (x=250..550).
-    // Splits the middle section into upper and lower halves; ball must find
-    // the gap to climb toward gate 2.
-    { x1: 40,  y1: 400, x2: 250, y2: 400 },
+    // Horizontal walls in middle at y=400. Two gaps: x=150..200 (entry to
+    // the dead-end pocket above) and x=250..550 (the central path through).
+    { x1: 40,  y1: 400, x2: 150, y2: 400 },
+    { x1: 200, y1: 400, x2: 250, y2: 400 },
     { x1: 550, y1: 400, x2: 760, y2: 400 },
 
-    // Stub wall in upper-middle - creates a dead-end nook on the left that
-    // a ball can wander into, without blocking the central diagonal path.
-    { x1: 250, y1: 400, x2: 250, y2: 320 },
-    { x1: 250, y1: 320, x2: 150, y2: 320 },
+    // Dead-end pocket above the y=400 wall, x=150..250, y=320..400. Single
+    // entry from below through the 50px gap at x=150..200, y=400. A ball
+    // that wanders in has to back out the same way - wasted stroke.
+    { x1: 250, y1: 400, x2: 250, y2: 320 },  // right wall
+    { x1: 250, y1: 320, x2: 150, y2: 320 },  // top wall
+    { x1: 150, y1: 320, x2: 150, y2: 400 },  // left wall (closes the pocket)
 
     // Vertical wall in upper section - blocks the upper portion of the path
     // from gate 2 to the hole. Ball can fly under (y > 150) but a high lob
