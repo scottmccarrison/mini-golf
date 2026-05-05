@@ -726,13 +726,15 @@ function gameLoop(timestamp) {
     chatOpen = false;
   }
 
-  // Show reset button only when the ball is at rest and the player can act.
-  // Blocked during animations/transitions: sunk, nextHole, flyover, hazard, rolling.
-  const activePlay = game.state === 'aiming';
-  if (activePlay) {
+  // Reset button is visible during all active play (matches chat button
+  // persistence). Disabled during animations/transitions and on opponent's
+  // turn so it doesn't fire mid-roll or out-of-turn.
+  const inGame = game.state !== 'title' && game.state !== 'gameover';
+  if (inGame) {
     resetBtn.classList.remove('hidden');
-    if (game.mode === 'mp') {
-      // MP: enabled only on our turn while ball is at rest
+    if (game.state !== 'aiming') {
+      resetBtn.disabled = true;
+    } else if (game.mode === 'mp') {
       const isMyTurn = game.currentTurnPlayerId === (session && session.id);
       const atRest = game.ball.vx === 0 && game.ball.vy === 0;
       resetBtn.disabled = !(isMyTurn && atRest);
