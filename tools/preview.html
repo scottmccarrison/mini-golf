@@ -100,6 +100,7 @@
   <h1>Mini Golf - Course Preview</h1>
   <div class="subtitle">All 9 courses, rendered live from <code>js/courses.js</code>. Edits to the source show up on refresh.</div>
   <div class="toolbar">
+    <button id="save-snapshot" type="button">Save HTML snapshot</button>
     <button id="download-all" type="button">Download all as PNGs</button>
     <span id="download-status" class="status"></span>
   </div>
@@ -117,6 +118,10 @@
     <span class="lg-gate">One-way gate</span>
     <span class="lg-tele">Teleporter</span>
   </div>
-  <script type="module" src="./preview.js"></script>
+  <script type="module">
+    // Inline import with timestamp so course/render edits load fresh on every
+    // page open (browsers cache static module imports aggressively).
+    import(`./preview.js?v=${Date.now()}`);
+  </script>
 </body>
 </html>

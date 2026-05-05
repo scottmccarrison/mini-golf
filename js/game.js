@@ -257,12 +257,15 @@ function updateSunk(game, dt) {
   if (game.animState.sinkTimer >= 1) {
     game.scorecard[game.currentHole] = game.strokes;
 
+    // Hide the ball in every mode once the sink animation finishes; otherwise
+    // the renderer would pop it back to the hole position during the
+    // 'nextHole' fade-out (solo) or while waiting for opponents (MP).
+    game.ball.x = -999;
+    game.ball.y = -999;
+    game.ball.vx = 0;
+    game.ball.vy = 0;
+
     if (game.mode === 'mp') {
-      // In MP, hide the ball and wait for other players to finish the hole
-      game.ball.x = -999;
-      game.ball.y = -999;
-      game.ball.vx = 0;
-      game.ball.vy = 0;
       game.state = 'spectating';
     } else if (game.currentHole < 8) {
       game.state = 'nextHole';
@@ -500,6 +503,14 @@ export function applyTurnComplete(game, playerId, strokes, sunk) {
   const player = game.players.find(p => p.id === playerId);
   if (player) {
     player.scorecard[game.currentHole] = strokes;
+  }
+  // When a remote player sinks, their last broadcast ball position was at the
+  // hole. Move it off-screen so it doesn't sit there until the next hole loads.
+  if (sunk && game.balls && game.balls[playerId]) {
+    game.balls[playerId].x = -999;
+    game.balls[playerId].y = -999;
+    game.balls[playerId].vx = 0;
+    game.balls[playerId].vy = 0;
   }
 }
 

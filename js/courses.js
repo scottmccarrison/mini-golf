@@ -29,8 +29,8 @@
 const hole1 = {
   name: 'Slingshot',
   par: 2,
-  tee: { x: 100, y: 300 },
-  hole: { x: 700, y: 300 },
+  tee: { x: 120, y: 300 },
+  hole: { x: 680, y: 300 },
   holeRadius: 12,
   bounds: { width: 800, height: 600 },
   walls: [
@@ -61,7 +61,7 @@ const hole1 = {
     // Magnet sits 80px above the hole - a dead-straight putt gets tugged
     // upward and misses high. Player has to compensate by aiming low or
     // banking off the bottom wall.
-    { x: 700, y: 220, strength: 500, radius: 220 },
+    { x: 680, y: 220, strength: 500, radius: 220 },
   ],
   oneWayGates: [],
   teleporters: [],
@@ -74,8 +74,8 @@ const hole1 = {
 const hole2 = {
   name: 'The Crescent',
   par: 3,
-  tee: { x: 150, y: 500 },
-  hole: { x: 750, y: 500 },
+  tee: { x: 210, y: 450 },
+  hole: { x: 690, y: 450 },
   holeRadius: 12,
   bounds: { width: 900, height: 600 },
   walls: [
@@ -137,14 +137,16 @@ const hole3 = {
   name: 'Funnel',
   par: 3,
   tee: { x: 350, y: 800 },
-  hole: { x: 350, y: 130 },
+  hole: { x: 350, y: 260 },
   holeRadius: 12,
   bounds: { width: 700, height: 900 },
   walls: [
-    // Triangle: wide base at bottom, point at top
+    // Triangle base + chamfered apex (80px-wide cap at y=220 instead of a sharp
+    // point at y=100). Cap gives the hole 40px clearance on every side.
     { x1: 100, y1: 850, x2: 600, y2: 850 },
-    { x1: 600, y1: 850, x2: 350, y2: 100 },
-    { x1: 350, y1: 100, x2: 100, y2: 850 },
+    { x1: 600, y1: 850, x2: 390, y2: 220 },
+    { x1: 390, y1: 220, x2: 310, y2: 220 },
+    { x1: 310, y1: 220, x2: 100, y2: 850 },
     // Right-diagonal notch baffles (jut inward from the right wall)
     { x1: 562, y1: 737, x2: 515, y2: 753 },
     { x1: 525, y1: 625, x2: 478, y2: 641 },
@@ -163,10 +165,12 @@ const hole3 = {
   waterHazards: [],
   movingObstacles: [],
   slopes: [
-    // Left half: push LEFT toward the left diagonal wall (and slightly up)
+    // Left half: push LEFT toward the left diagonal wall (and slightly up).
+    // Polygon top edge follows the left triangle wall at y=300 (x=283), so the
+    // slope no longer extends outside the playfield.
     {
       points: [
-        { x: 100, y: 300 },
+        { x: 283, y: 300 },
         { x: 350, y: 300 },
         { x: 350, y: 850 },
         { x: 100, y: 850 },
@@ -174,11 +178,12 @@ const hole3 = {
       ax: -50,
       ay: -30,
     },
-    // Right half: push RIGHT toward the right diagonal wall (and slightly up)
+    // Right half: push RIGHT toward the right diagonal wall (and slightly up).
+    // Polygon top edge follows the right triangle wall at y=300 (x=417).
     {
       points: [
         { x: 350, y: 300 },
-        { x: 600, y: 300 },
+        { x: 417, y: 300 },
         { x: 600, y: 850 },
         { x: 350, y: 850 },
       ],
@@ -245,36 +250,36 @@ const hole4 = {
   movingObstacles: [],
   slopes: [],
   speedPads: [
-    // Right arm - push outward (east), launches ball into the dead-end wall
-    // where it bounces back into the junction with new energy
+    // Right arm - push outward (east). 30px buffer to dead-end wall (x=870)
+    // so the ball can rest off-pad after bouncing.
     {
       points: [
         { x: 650, y: 450 },
-        { x: 860, y: 450 },
-        { x: 860, y: 550 },
+        { x: 840, y: 450 },
+        { x: 840, y: 550 },
         { x: 650, y: 550 },
       ],
       ax: 1200,
       ay: 0,
     },
-    // Left arm - push outward (west), mirrors right arm
+    // Left arm - mirrors right arm with same 30px buffer to wall (x=30).
     {
       points: [
-        { x: 40,  y: 450 },
+        { x: 60,  y: 450 },
         { x: 250, y: 450 },
         { x: 250, y: 550 },
-        { x: 40,  y: 550 },
+        { x: 60,  y: 550 },
       ],
       ax: -1200,
       ay: 0,
     },
-    // Top arm - push toward hole (down-center funnels ball to cup)
+    // Top arm - push toward hole. 30px buffer on top/left/right walls.
     {
       points: [
-        { x: 360, y: 40  },
-        { x: 540, y: 40  },
-        { x: 540, y: 130 },
-        { x: 360, y: 130 },
+        { x: 380, y: 60  },
+        { x: 520, y: 60  },
+        { x: 520, y: 130 },
+        { x: 380, y: 130 },
       ],
       ax: 0,
       ay: -600,
@@ -366,7 +371,7 @@ const hole6 = {
   name: 'The Maze',
   par: 5,
   tee: { x: 200, y: 100 },
-  hole: { x: 700, y: 720 },
+  hole: { x: 700, y: 700 },
   holeRadius: 12,
   bounds: { width: 800, height: 800 },
   walls: [
@@ -424,7 +429,7 @@ const hole6 = {
 const hole7 = {
   name: 'The Roundabout',
   par: 5,
-  tee: { x: 450, y: 780 },
+  tee: { x: 450, y: 770 },
   hole: { x: 450, y: 140 },
   holeRadius: 12,
   bounds: { width: 900, height: 900 },
@@ -535,12 +540,13 @@ const hole8 = {
   magnets: [],
   oneWayGates: [],
   teleporters: [
-    // Island 1 -> Island 2
-    { a: { x: 220, y: 780, r: 25 }, b: { x: 280, y: 620, r: 25 } },
+    // Island 1 -> Island 2. Pad centers pulled 10px inward from island edges
+    // so the outer rim of each r=25 pad clears walls comfortably.
+    { a: { x: 210, y: 790, r: 25 }, b: { x: 290, y: 610, r: 25 } },
     // Island 2 -> Island 3
-    { a: { x: 420, y: 480, r: 25 }, b: { x: 580, y: 520, r: 25 } },
+    { a: { x: 410, y: 490, r: 25 }, b: { x: 590, y: 510, r: 25 } },
     // Island 3 -> Island 4
-    { a: { x: 720, y: 380, r: 25 }, b: { x: 780, y: 220, r: 25 } },
+    { a: { x: 710, y: 390, r: 25 }, b: { x: 790, y: 210, r: 25 } },
   ],
 };
 
@@ -552,8 +558,8 @@ const hole8 = {
 const hole9 = {
   name: 'The Gauntlet',
   par: 6,
-  tee: { x: 600, y: 850 },
-  hole: { x: 1100, y: 200 },
+  tee: { x: 600, y: 830 },
+  hole: { x: 1080, y: 200 },
   holeRadius: 12,
   bounds: { width: 1200, height: 900 },
   walls: [
@@ -580,13 +586,14 @@ const hole9 = {
   movingObstacles: [],
   slopes: [],
   speedPads: [
-    // Stage 1: Speed pad in stem pushing ball upward
+    // Stage 1: Speed pad in stem pushing ball upward. 30px buffer to stem
+    // walls (x=500/700) so the ball can rest off-pad if it doesn't clear.
     {
       points: [
-        { x: 510, y: 600 },
-        { x: 690, y: 600 },
-        { x: 690, y: 800 },
-        { x: 510, y: 800 },
+        { x: 530, y: 600 },
+        { x: 670, y: 600 },
+        { x: 670, y: 800 },
+        { x: 530, y: 800 },
       ],
       ax: 0,
       ay: -1500,
@@ -594,7 +601,7 @@ const hole9 = {
   ],
   magnets: [
     // Stage 3: Magnet at hole end pulls toward the cup
-    { x: 1100, y: 200, strength: 500, radius: 300 },
+    { x: 1080, y: 200, strength: 500, radius: 300 },
   ],
   oneWayGates: [
     // Stage 2: Gate at top of stem - ball must commit upward into the T arm

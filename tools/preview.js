@@ -1,13 +1,15 @@
 // preview.js - Render all courses to a grid of canvases for review.
 // Standalone visualization (does not import render.js) so the preview is
 // stable even as the in-game renderer evolves.
-
-import { COURSES } from '../js/courses.js';
+// Uses a dynamic, cache-busted import so course edits show up on every reload
+// (browsers cache static ES module imports aggressively).
 
 const TARGET_W = 720; // pixel width of each preview canvas
 
 const grid = document.getElementById('grid');
 const cards = []; // { idx, course, canvas } for download
+
+const { COURSES } = await import(`../js/courses.js?v=${Date.now()}`);
 
 for (let i = 0; i < COURSES.length; i++) {
   const course = COURSES[i];
@@ -16,10 +18,52 @@ for (let i = 0; i < COURSES.length; i++) {
 }
 
 const downloadBtn = document.getElementById('download-all');
+const snapshotBtn = document.getElementById('save-snapshot');
 const status = document.getElementById('download-status');
 if (downloadBtn) {
   downloadBtn.addEventListener('click', downloadAll);
 }
+if (snapshotBtn) {
+  snapshotBtn.addEventListener('click', () => {
+    const html = snapshotHTML();
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'index.html';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 250);
+    status.textContent = 'Snapshot downloaded. Save to renders/index.html and commit.';
+  });
+}
+
+// Build a self-contained static HTML snapshot: replaces every <canvas> with
+// an <img> using the canvas's PNG data URL, drops interactive toolbar/scripts.
+// Exposed on window so headless tooling (e.g. claude-in-chrome) can call it.
+function snapshotHTML() {
+  const root = document.documentElement.cloneNode(true);
+  const liveCanvases = Array.from(document.querySelectorAll('canvas'));
+  const cloneCanvases = Array.from(root.querySelectorAll('canvas'));
+  for (let i = 0; i < liveCanvases.length; i++) {
+    const dataURL = liveCanvases[i].toDataURL('image/png');
+    const img = root.ownerDocument.createElement('img');
+    img.src = dataURL;
+    img.alt = liveCanvases[i].closest('.card')?.querySelector('.title')?.textContent || '';
+    img.style.cssText = 'display:block;width:100%;height:auto;border:1px solid #1a1a2e;border-radius:4px;background:#0a3a1a;';
+    cloneCanvases[i].replaceWith(img);
+  }
+  const toolbar = root.querySelector('.toolbar');
+  if (toolbar) toolbar.remove();
+  root.querySelectorAll('script').forEach(s => s.remove());
+  const subtitle = root.querySelector('.subtitle');
+  if (subtitle) {
+    subtitle.textContent = `Static snapshot generated ${new Date().toISOString()} from js/courses.js.`;
+  }
+  return '<!doctype html>\n' + root.outerHTML + '\n';
+}
+window.snapshotHTML = snapshotHTML;
 
 function downloadAll() {
   status.textContent = `Saving ${cards.length} PNGs...`;
