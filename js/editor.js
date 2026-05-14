@@ -3,8 +3,23 @@
 
 import { COURSES } from './courses.js';
 import { render, worldToScreen, screenToWorld } from './render.js';
+import { initInput, getInput, resetInput, setEnabled } from './input.js';
+import { stepBall, DT, MAX_POWER, launchBall } from './physics.js';
 
 const STORAGE_KEY = 'golf-editor-key';
+
+// Touch device detection
+const IS_TOUCH = typeof window !== 'undefined' &&
+  ('ontouchstart' in window || matchMedia('(pointer: coarse)').matches);
+
+// Handle sizes in screen px
+const HANDLE_SIZE = IS_TOUCH ? 24 : 12;
+const HANDLE_RADIUS_SIZE = IS_TOUCH ? 16 : 8;
+const HANDLE_HIT_RADIUS = IS_TOUCH ? 24 : 16;
+
+// Handle colors
+const HANDLE_COLOR_CENTER = '#4ecdc4';
+const HANDLE_COLOR_RADIUS = '#ffe500';
 
 function apiUrl() {
   return location.pathname.startsWith('/golf') ? '/golf/api/edit/save-hole' : '/api/edit/save-hole';
@@ -69,6 +84,37 @@ function deepClone(obj) {
 }
 
 // ---------------------------------------------------------------------------
+// Toast notification
+// ---------------------------------------------------------------------------
+
+function showToast(message) {
+  let toast = document.getElementById('editor-toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'editor-toast';
+    toast.style.cssText = [
+      'position:fixed',
+      'bottom:80px',
+      'left:50%',
+      'transform:translateX(-50%)',
+      'background:rgba(0,0,0,0.85)',
+      'color:#fff',
+      'padding:10px 20px',
+      'border-radius:8px',
+      'font-size:15px',
+      'z-index:9999',
+      'pointer-events:none',
+      'transition:opacity 0.3s',
+    ].join(';');
+    document.body.appendChild(toast);
+  }
+  toast.textContent = message;
+  toast.style.opacity = '1';
+  clearTimeout(toast._hideTimer);
+  toast._hideTimer = setTimeout(() => { toast.style.opacity = '0'; }, 2500);
+}
+
+// ---------------------------------------------------------------------------
 // Fake game object for render.js
 // ---------------------------------------------------------------------------
 
@@ -79,7 +125,7 @@ function makeFakeGame(holeIndex) {
     state: 'aiming',
     strokes: 0,
     scorecard: [0, 0, 0, 0, 0, 0, 0, 0, 0],
-    ball: hole ? { x: hole.tee.x, y: hole.tee.y, vx: 0, vy: 0 } : null,
+    ball: null,
     time: 0,
     trail: [],
     zoom: { level: 1, panX: 0, panY: 0 },
@@ -112,6 +158,247 @@ const ELEM_TYPES = [
 ];
 
 // ---------------------------------------------------------------------------
+// Handle generation
+// Produces a flat list of handle descriptors from the current wipHole.
+// Each handle: { type, elIdx, role, vertexIdx?, wx, wy, isRadius }
+// ---------------------------------------------------------------------------
+
+function getHandles(hole) {
+  if (!hole) return [];
+  const handles = [];
+
+  // Tee
+  if (hole.tee) {
+    handles.push({ type: 'tee', elIdx: 0, role: 'center', wx: hole.tee.x, wy: hole.tee.y, isRadius: false });
+  }
+
+  // Cup
+  if (hole.hole) {
+    handles.push({ type: 'cup', elIdx: 0, role: 'center', wx: hole.hole.x, wy: hole.hole.y, isRadius: false });
+    // Radius handle: offset to the right by holeRadius
+    const hr = hole.holeRadius || 12;
+    handles.push({ type: 'cup', elIdx: 0, role: 'radius', wx: hole.hole.x + hr, wy: hole.hole.y, isRadius: true });
+  }
+
+  // Walls
+  if (hole.walls) {
+    hole.walls.forEach((w, i) => {
+      handles.push({ type: 'walls', elIdx: i, role: 'p1', wx: w.x1, wy: w.y1, isRadius: false });
+      handles.push({ type: 'walls', elIdx: i, role: 'p2', wx: w.x2, wy: w.y2, isRadius: false });
+    });
+  }
+
+  // One-way gates
+  if (hole.oneWayGates) {
+    hole.oneWayGates.forEach((g, i) => {
+      handles.push({ type: 'oneWayGates', elIdx: i, role: 'p1', wx: g.x1, wy: g.y1, isRadius: false });
+      handles.push({ type: 'oneWayGates', elIdx: i, role: 'p2', wx: g.x2, wy: g.y2, isRadius: false });
+    });
+  }
+
+  // Bumpers
+  if (hole.bumpers) {
+    hole.bumpers.forEach((b, i) => {
+      handles.push({ type: 'bumpers', elIdx: i, role: 'center', wx: b.x, wy: b.y, isRadius: false });
+      const r = b.r != null ? b.r : 14;
+      handles.push({ type: 'bumpers', elIdx: i, role: 'radius', wx: b.x + r, wy: b.y, isRadius: true });
+    });
+  }
+
+  // Magnets
+  if (hole.magnets) {
+    hole.magnets.forEach((m, i) => {
+      handles.push({ type: 'magnets', elIdx: i, role: 'center', wx: m.x, wy: m.y, isRadius: false });
+      const r = m.radius != null ? m.radius : 150;
+      handles.push({ type: 'magnets', elIdx: i, role: 'radius', wx: m.x + r, wy: m.y, isRadius: true });
+    });
+  }
+
+  // Teleporters
+  if (hole.teleporters) {
+    hole.teleporters.forEach((t, i) => {
+      handles.push({ type: 'teleporters', elIdx: i, role: 'a-center', wx: t.a.x, wy: t.a.y, isRadius: false });
+      handles.push({ type: 'teleporters', elIdx: i, role: 'a-radius', wx: t.a.x + (t.a.r || 25), wy: t.a.y, isRadius: true });
+      handles.push({ type: 'teleporters', elIdx: i, role: 'b-center', wx: t.b.x, wy: t.b.y, isRadius: false });
+      handles.push({ type: 'teleporters', elIdx: i, role: 'b-radius', wx: t.b.x + (t.b.r || 25), wy: t.b.y, isRadius: true });
+    });
+  }
+
+  // Polygon types - one handle per vertex
+  const polyTypes = ['sandTraps', 'waterHazards', 'slopes', 'speedPads'];
+  for (const key of polyTypes) {
+    if (hole[key]) {
+      hole[key].forEach((el, i) => {
+        if (el.points) {
+          el.points.forEach((pt, vi) => {
+            handles.push({ type: key, elIdx: i, role: 'vertex', vertexIdx: vi, wx: pt.x, wy: pt.y, isRadius: false });
+          });
+        }
+      });
+    }
+  }
+
+  // Moving obstacles - pivot center only
+  if (hole.movingObstacles) {
+    hole.movingObstacles.forEach((ob, i) => {
+      if (ob.pivot) {
+        handles.push({ type: 'movingObstacles', elIdx: i, role: 'pivot', wx: ob.pivot.x, wy: ob.pivot.y, isRadius: false });
+      }
+    });
+  }
+
+  return handles;
+}
+
+// ---------------------------------------------------------------------------
+// Apply a drag delta to wipHole based on drag state
+// ---------------------------------------------------------------------------
+
+function applyDrag(hole, drag, worldX, worldY) {
+  const { type, elIdx, role, vertexIdx } = drag;
+
+  switch (type) {
+    case 'tee':
+      hole.tee.x = worldX;
+      hole.tee.y = worldY;
+      break;
+
+    case 'cup':
+      if (role === 'center') {
+        hole.hole.x = worldX;
+        hole.hole.y = worldY;
+      } else if (role === 'radius') {
+        const cx = hole.hole.x;
+        const cy = hole.hole.y;
+        hole.holeRadius = Math.max(4, Math.hypot(worldX - cx, worldY - cy));
+      }
+      break;
+
+    case 'walls':
+    case 'oneWayGates': {
+      const el = hole[type][elIdx];
+      if (role === 'p1') { el.x1 = worldX; el.y1 = worldY; }
+      else if (role === 'p2') { el.x2 = worldX; el.y2 = worldY; }
+      break;
+    }
+
+    case 'bumpers': {
+      const b = hole.bumpers[elIdx];
+      if (role === 'center') { b.x = worldX; b.y = worldY; }
+      else if (role === 'radius') {
+        b.r = Math.max(4, Math.hypot(worldX - b.x, worldY - b.y));
+      }
+      break;
+    }
+
+    case 'magnets': {
+      const m = hole.magnets[elIdx];
+      if (role === 'center') { m.x = worldX; m.y = worldY; }
+      else if (role === 'radius') {
+        m.radius = Math.max(4, Math.hypot(worldX - m.x, worldY - m.y));
+      }
+      break;
+    }
+
+    case 'teleporters': {
+      const t = hole.teleporters[elIdx];
+      if (role === 'a-center') { t.a.x = worldX; t.a.y = worldY; }
+      else if (role === 'a-radius') { t.a.r = Math.max(4, Math.hypot(worldX - t.a.x, worldY - t.a.y)); }
+      else if (role === 'b-center') { t.b.x = worldX; t.b.y = worldY; }
+      else if (role === 'b-radius') { t.b.r = Math.max(4, Math.hypot(worldX - t.b.x, worldY - t.b.y)); }
+      break;
+    }
+
+    case 'sandTraps':
+    case 'waterHazards':
+    case 'slopes':
+    case 'speedPads': {
+      const el = hole[type][elIdx];
+      if (role === 'vertex' && el.points && vertexIdx != null) {
+        el.points[vertexIdx].x = worldX;
+        el.points[vertexIdx].y = worldY;
+      }
+      break;
+    }
+
+    case 'movingObstacles': {
+      const ob = hole.movingObstacles[elIdx];
+      if (role === 'pivot' && ob.pivot) {
+        ob.pivot.x = worldX;
+        ob.pivot.y = worldY;
+      }
+      break;
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Hit-test handles in screen space
+// Returns handle descriptor or null
+// ---------------------------------------------------------------------------
+
+function hitTestHandles(screenX, screenY, hole, fakeGame, viewport) {
+  const handles = getHandles(hole);
+  // Iterate in reverse so top-drawn handles win (radius handles drawn on top)
+  for (let i = handles.length - 1; i >= 0; i--) {
+    const h = handles[i];
+    const sp = worldToScreen(h.wx, h.wy, fakeGame, viewport, hole);
+    const dist = Math.hypot(screenX - sp.x, screenY - sp.y);
+    if (dist <= HANDLE_HIT_RADIUS) return h;
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// Draw handles
+// ---------------------------------------------------------------------------
+
+function drawHandles(ctx, state) {
+  if (state.mode !== 'edit') return;
+  const hole = state.wipHole;
+  if (!hole) return;
+
+  const handles = getHandles(hole);
+  const vp = state.viewport;
+  const fg = state.fakeGame;
+
+  ctx.save();
+
+  for (const h of handles) {
+    const sp = worldToScreen(h.wx, h.wy, fg, vp, hole);
+    const size = h.isRadius ? HANDLE_RADIUS_SIZE : HANDLE_SIZE;
+    const r = size / 2;
+    const fill = h.isRadius ? HANDLE_COLOR_RADIUS : HANDLE_COLOR_CENTER;
+
+    // Check if this handle is being hovered or actively dragged
+    const isDragging = state.dragging &&
+      state.dragging.type === h.type &&
+      state.dragging.elIdx === h.elIdx &&
+      state.dragging.role === h.role &&
+      (h.role !== 'vertex' || state.dragging.vertexIdx === h.vertexIdx);
+
+    ctx.beginPath();
+    ctx.arc(sp.x, sp.y, r, 0, Math.PI * 2);
+    ctx.fillStyle = fill;
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    if (isDragging) {
+      // Glow ring
+      ctx.beginPath();
+      ctx.arc(sp.x, sp.y, r + 4, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+  }
+
+  ctx.restore();
+}
+
+// ---------------------------------------------------------------------------
 // Sidebar build
 // ---------------------------------------------------------------------------
 
@@ -142,10 +429,12 @@ function buildSidebar(state, onChange) {
     state.wipHole = deepClone(COURSES[idx]);
     state.pristineHole = deepClone(COURSES[idx]);
     state.selected = null;
-    // Update fakeGame currentHole and ball position
+    state.dragging = null;
+    // Exit play mode if active
+    if (state.mode === 'play') exitPlayMode(state);
+    // Update fakeGame currentHole
     state.fakeGame.currentHole = idx;
-    const hole = state.wipHole;
-    state.fakeGame.ball = hole ? { x: hole.tee.x, y: hole.tee.y, vx: 0, vy: 0 } : null;
+    state.fakeGame.ball = null;
     onChange();
   });
   holeSection.appendChild(holePicker);
@@ -157,6 +446,8 @@ function buildSidebar(state, onChange) {
   revertBtn.addEventListener('click', () => {
     state.wipHole = deepClone(state.pristineHole);
     state.selected = null;
+    state.dragging = null;
+    if (state.mode === 'play') exitPlayMode(state);
     onChange();
   });
   holeSection.appendChild(revertBtn);
@@ -211,6 +502,40 @@ function buildSidebar(state, onChange) {
   elemSection.appendChild(elemList);
   sidebar.appendChild(elemSection);
 
+  // --- Add palette section ---
+  const paletteSection = document.createElement('div');
+  paletteSection.className = 'editor-section';
+  paletteSection.id = 'editor-palette-section';
+  paletteSection.innerHTML = `<div class="editor-section-title">Add Element</div>`;
+  const paletteGrid = document.createElement('div');
+  paletteGrid.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px;';
+
+  const ADD_ITEMS = [
+    { label: '+ Wall',       action: () => addElement(state, 'walls', onChange) },
+    { label: '+ Bumper',     action: () => addElement(state, 'bumpers', onChange) },
+    { label: '+ Sand',       action: () => addElement(state, 'sandTraps', onChange) },
+    { label: '+ Water',      action: () => addElement(state, 'waterHazards', onChange) },
+    { label: '+ Slope',      action: () => addElement(state, 'slopes', onChange) },
+    { label: '+ Speed Pad',  action: () => addElement(state, 'speedPads', onChange) },
+    { label: '+ Magnet',     action: () => addElement(state, 'magnets', onChange) },
+    { label: '+ Gate',       action: () => addElement(state, 'oneWayGates', onChange) },
+    { label: '+ Teleporter', action: () => addElement(state, 'teleporters', onChange) },
+  ];
+
+  for (const item of ADD_ITEMS) {
+    const btn = document.createElement('button');
+    btn.className = 'editor-btn editor-btn-secondary';
+    btn.textContent = item.label;
+    btn.style.cssText = 'font-size:11px;padding:4px 6px;flex:0 0 auto;';
+    btn.addEventListener('click', () => {
+      if (state.mode === 'play') return;
+      item.action();
+    });
+    paletteGrid.appendChild(btn);
+  }
+  paletteSection.appendChild(paletteGrid);
+  sidebar.appendChild(paletteSection);
+
   // --- Properties section ---
   const propSection = document.createElement('div');
   propSection.className = 'editor-section';
@@ -225,11 +550,42 @@ function buildSidebar(state, onChange) {
   // --- Save section ---
   const saveSection = document.createElement('div');
   saveSection.className = 'editor-section editor-save-section';
+
+  // Play toggle button (above save)
+  const playBtn = document.createElement('button');
+  playBtn.className = 'editor-btn editor-btn-secondary';
+  playBtn.id = 'editor-play-btn';
+  playBtn.textContent = 'Play in place';
+  playBtn.addEventListener('click', () => {
+    if (state.mode === 'edit') {
+      enterPlayMode(state, canvas_ref);
+      updatePlayUI(state);
+    } else {
+      exitPlayMode(state);
+      updatePlayUI(state);
+    }
+  });
+  saveSection.appendChild(playBtn);
+
+  // Play stats line
+  const playStats = document.createElement('div');
+  playStats.id = 'editor-play-stats';
+  playStats.className = 'editor-readonly';
+  playStats.style.cssText = 'margin:4px 0;font-size:12px;';
+  playStats.textContent = '';
+  saveSection.appendChild(playStats);
+
   const saveBtn = document.createElement('button');
   saveBtn.className = 'editor-btn editor-btn-primary';
   saveBtn.id = 'editor-save';
   saveBtn.textContent = 'Save';
-  saveBtn.addEventListener('click', () => save(state));
+  saveBtn.addEventListener('click', () => {
+    if (state.mode === 'play') {
+      exitPlayMode(state);
+      updatePlayUI(state);
+    }
+    save(state);
+  });
   const saveStatus = document.createElement('div');
   saveStatus.className = 'editor-save-status';
   saveStatus.id = 'editor-save-status';
@@ -240,6 +596,148 @@ function buildSidebar(state, onChange) {
   // Initial fill
   fillMetaInputs(state);
   rebuildElementList(state, onChange);
+}
+
+// Reference to canvas, set during startEditor
+let canvas_ref = null;
+
+// ---------------------------------------------------------------------------
+// Play mode helpers
+// ---------------------------------------------------------------------------
+
+function enterPlayMode(state, canvas) {
+  state.mode = 'play';
+  const h = state.wipHole;
+  state.playGame = {
+    ball: { x: h.tee.x, y: h.tee.y, vx: 0, vy: 0 },
+    time: 0,
+    strokes: 0,
+    rolling: false,
+    accumulator: 0,
+  };
+  state.fakeGame.state = 'aiming';
+  state.fakeGame.ball = { x: h.tee.x, y: h.tee.y, vx: 0, vy: 0 };
+  state.fakeGame.input = {};
+
+  // Init input system against the canvas
+  const canvasEl = canvas || canvas_ref;
+  if (canvasEl) {
+    initInput(canvasEl, () => {
+      if (!state.playGame || !state.playGame.ball) return { x: 0, y: 0 };
+      const sp = worldToScreen(state.playGame.ball.x, state.playGame.ball.y, state.fakeGame, state.viewport, state.wipHole);
+      return sp;
+    });
+    setEnabled(true);
+  }
+}
+
+function exitPlayMode(state) {
+  setEnabled(false);
+  state.mode = 'edit';
+  state.playGame = null;
+  state.fakeGame.ball = null;
+  state.fakeGame.state = 'aiming';
+  state.fakeGame.input = {};
+}
+
+function updatePlayUI(state) {
+  const playBtn = document.getElementById('editor-play-btn');
+  const paletteSection = document.getElementById('editor-palette-section');
+  const propSection = document.getElementById('editor-properties-section');
+
+  if (state.mode === 'play') {
+    if (playBtn) playBtn.textContent = 'Stop playing';
+    if (paletteSection) paletteSection.style.opacity = '0.4';
+    if (propSection) propSection.style.opacity = '0.4';
+  } else {
+    if (playBtn) playBtn.textContent = 'Play in place';
+    if (paletteSection) paletteSection.style.opacity = '';
+    if (propSection) propSection.style.opacity = '';
+    const statsEl = document.getElementById('editor-play-stats');
+    if (statsEl) statsEl.textContent = '';
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Add element defaults
+// ---------------------------------------------------------------------------
+
+function addElement(state, type, onChange) {
+  const h = state.wipHole;
+  if (!h) return;
+
+  const cx = h.bounds ? h.bounds.width / 2 : 200;
+  const cy = h.bounds ? h.bounds.height / 2 : 200;
+
+  // Square polygon helper (80x80)
+  function square80() {
+    const half = 40;
+    return [
+      { x: cx - half, y: cy - half },
+      { x: cx + half, y: cy - half },
+      { x: cx + half, y: cy + half },
+      { x: cx - half, y: cy + half },
+    ];
+  }
+
+  let newEl;
+  switch (type) {
+    case 'walls':
+      newEl = { x1: cx - 50, y1: cy, x2: cx + 50, y2: cy };
+      break;
+    case 'bumpers':
+      newEl = { x: cx, y: cy, r: 14 };
+      break;
+    case 'sandTraps':
+      newEl = { points: square80() };
+      break;
+    case 'waterHazards':
+      newEl = { points: square80() };
+      break;
+    case 'slopes':
+      newEl = { points: square80(), ax: 0, ay: 0 };
+      break;
+    case 'speedPads':
+      newEl = { points: square80(), ax: 0, ay: 0 };
+      break;
+    case 'magnets':
+      newEl = { x: cx, y: cy, strength: 200, radius: 150 };
+      break;
+    case 'oneWayGates':
+      newEl = { x1: cx - 50, y1: cy, x2: cx + 50, y2: cy, nx: 0, ny: -1 };
+      break;
+    case 'teleporters':
+      newEl = { a: { x: cx - 100, y: cy, r: 25 }, b: { x: cx + 100, y: cy, r: 25 } };
+      break;
+    default:
+      return;
+  }
+
+  if (!h[type]) h[type] = [];
+  h[type].push(newEl);
+  const newIdx = h[type].length - 1;
+  state.selected = { type, index: newIdx };
+  onChange();
+}
+
+// ---------------------------------------------------------------------------
+// Delete selected element
+// ---------------------------------------------------------------------------
+
+function deleteSelected(state, onChange) {
+  if (!state.selected) return;
+  const { type, index } = state.selected;
+
+  // Cannot delete pseudo-elements
+  if (type === 'tee' || type === 'cup' || type === 'markers') return;
+
+  const h = state.wipHole;
+  if (!h || !h[type] || !Array.isArray(h[type])) return;
+
+  h[type].splice(index, 1);
+  state.selected = null;
+  state.dragging = null;
+  onChange();
 }
 
 // ---------------------------------------------------------------------------
@@ -323,6 +821,7 @@ function rebuildElementList(state, onChange) {
     row.dataset.index = '0';
     row.textContent = pseudo === 'tee' ? 'Tee' : 'Cup';
     row.addEventListener('pointerdown', () => {
+      if (state.mode === 'play') return;
       state.selected = { type: pseudo, index: 0 };
       rebuildElementList(state, onChange);
       refreshPropertiesPanel(state, onChange);
@@ -364,6 +863,7 @@ function rebuildElementList(state, onChange) {
       row.dataset.index = String(i);
       row.textContent = `${label} ${i + 1}`;
       row.addEventListener('pointerdown', () => {
+        if (state.mode === 'play') return;
         state.selected = { type: key, index: i };
         rebuildElementList(state, onChange);
         refreshPropertiesPanel(state, onChange);
@@ -380,6 +880,17 @@ function rebuildElementList(state, onChange) {
 // ---------------------------------------------------------------------------
 // Properties panel
 // ---------------------------------------------------------------------------
+
+// Debounce timer for properties panel refresh during drag
+let _propRefreshTimer = null;
+
+function refreshPropertiesPanelDebounced(state, onChange) {
+  if (_propRefreshTimer) return;
+  _propRefreshTimer = setTimeout(() => {
+    _propRefreshTimer = null;
+    refreshPropertiesPanel(state, onChange);
+  }, 33); // ~30Hz
+}
 
 function refreshPropertiesPanel(state, onChange) {
   const body = document.getElementById('editor-properties-body');
@@ -462,16 +973,22 @@ function refreshPropertiesPanel(state, onChange) {
   } else if (type === 'sandTraps' || type === 'waterHazards') {
     const el = h[type][index];
     const pts = (el.points || []).length;
-    body.appendChild(readonlyInfo(`${pts} points (Phase 3: drag handles)`));
+    body.appendChild(readonlyInfo(`${pts} vertices (drag handles to reshape)`));
   } else if (type === 'slopes' || type === 'speedPads') {
     const el = h[type][index];
     const pts = (el.points || []).length;
-    body.appendChild(readonlyInfo(`${pts} points`));
+    body.appendChild(readonlyInfo(`${pts} vertices (drag handles to reshape)`));
     body.appendChild(numField('ax', () => el.ax, v => { el.ax = v; }, 0.1));
     body.appendChild(numField('ay', () => el.ay, v => { el.ay = v; }, 0.1));
   } else if (type === 'movingObstacles') {
     const el = h.movingObstacles[index];
-    body.appendChild(readonlyInfo(`type: ${el.type || 'windmill'} (Phase 3)`));
+    body.appendChild(readonlyInfo(`type: ${el.type || 'windmill'}`));
+    if (el.pivot) {
+      body.appendChild(numField('Pivot X', () => el.pivot.x, v => { el.pivot.x = v; }));
+      body.appendChild(numField('Pivot Y', () => el.pivot.y, v => { el.pivot.y = v; }));
+    }
+    if (el.armLength != null) body.appendChild(numField('Arm Length', () => el.armLength, v => { el.armLength = v; }));
+    if (el.rpm != null) body.appendChild(numField('RPM', () => el.rpm, v => { el.rpm = v; }, 0.1));
   }
 }
 
@@ -500,7 +1017,7 @@ function setupCanvas(canvas, ctx, state) {
 }
 
 // ---------------------------------------------------------------------------
-// Hit testing
+// Hit testing (element bodies)
 // ---------------------------------------------------------------------------
 
 const HIT_RADIUS = 12;    // world px for point targets
@@ -613,27 +1130,109 @@ function hitTest(worldX, worldY, hole) {
 }
 
 // ---------------------------------------------------------------------------
-// Click-to-select
+// Pointer events (handles + click-to-select + drag)
 // ---------------------------------------------------------------------------
 
-function setupClickToSelect(canvas, state, onChange) {
+function setupPointerEvents(canvas, state, onChange) {
   canvas.addEventListener('pointerdown', (e) => {
-    // Only single-finger/primary clicks
     if (e.button !== undefined && e.button !== 0) return;
+
+    // In play mode, input.js handles everything
+    if (state.mode === 'play') return;
 
     const rect = canvas.getBoundingClientRect();
     const screenX = e.clientX - rect.left;
     const screenY = e.clientY - rect.top;
 
+    // 1. Hit-test handles first
+    const handleHit = hitTestHandles(screenX, screenY, state.wipHole, state.fakeGame, state.viewport);
+    if (handleHit) {
+      // Select the element this handle belongs to
+      const selIndex = handleHit.elIdx;
+      state.selected = { type: handleHit.type, index: selIndex };
+
+      // Enter drag mode
+      const world = screenToWorld(screenX, screenY, state.fakeGame, state.viewport, state.wipHole);
+      state.dragging = {
+        type: handleHit.type,
+        elIdx: handleHit.elIdx,
+        role: handleHit.role,
+        vertexIdx: handleHit.vertexIdx,
+        startWorld: { x: world.x, y: world.y },
+        currentWorld: { x: world.x, y: world.y },
+      };
+
+      canvas.setPointerCapture(e.pointerId);
+      rebuildElementList(state, onChange);
+      refreshPropertiesPanel(state, onChange);
+      return;
+    }
+
+    // 2. Fall back to element body hit-test for selection
     const world = screenToWorld(screenX, screenY, state.fakeGame, state.viewport, state.wipHole);
     const hit = hitTest(world.x, world.y, state.wipHole);
-
     if (hit) {
       state.selected = hit;
       rebuildElementList(state, onChange);
       refreshPropertiesPanel(state, onChange);
     }
-    // Don't clear selection on miss - user may click on empty canvas to pan in future
+    // No hit: leave selection as-is
+  });
+
+  canvas.addEventListener('pointermove', (e) => {
+    if (!state.dragging) return;
+    if (state.mode === 'play') return;
+
+    const rect = canvas.getBoundingClientRect();
+    const screenX = e.clientX - rect.left;
+    const screenY = e.clientY - rect.top;
+
+    let world = screenToWorld(screenX, screenY, state.fakeGame, state.viewport, state.wipHole);
+
+    // Shift: snap to 10px grid
+    if (e.shiftKey) {
+      world.x = Math.round(world.x / 10) * 10;
+      world.y = Math.round(world.y / 10) * 10;
+    }
+
+    state.dragging.currentWorld = world;
+    applyDrag(state.wipHole, state.dragging, world.x, world.y);
+
+    // Keep fakeGame ball synced if tee moved
+    if (state.dragging.type === 'tee' && state.wipHole.tee) {
+      state.fakeGame.ball = null;
+    }
+
+    refreshPropertiesPanelDebounced(state, onChange);
+  });
+
+  function endDrag(e) {
+    if (!state.dragging) return;
+    state.dragging = null;
+    try { canvas.releasePointerCapture(e.pointerId); } catch (_) {}
+    refreshPropertiesPanel(state, onChange);
+  }
+
+  canvas.addEventListener('pointerup', endDrag);
+  canvas.addEventListener('pointercancel', endDrag);
+}
+
+// ---------------------------------------------------------------------------
+// Delete key listener
+// ---------------------------------------------------------------------------
+
+function setupDeleteKey(state, onChange) {
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+
+    // Don't intercept when typing in an input or textarea
+    const tag = document.activeElement && document.activeElement.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
+    if (state.mode === 'play') return;
+
+    deleteSelected(state, onChange);
+    e.preventDefault();
   });
 }
 
@@ -739,13 +1338,101 @@ function drawSelection(ctx, state) {
 // Render loop
 // ---------------------------------------------------------------------------
 
-function startRenderLoop(canvas, ctx, state) {
-  function loop() {
+function startRenderLoop(canvas, ctx, state, onChange) {
+  // Fixed-timestep accumulator for play mode physics
+  let lastTime = null;
+
+  function loop(timestamp) {
+    if (!lastTime) lastTime = timestamp;
+    const frameTime = Math.min((timestamp - lastTime) / 1000, 0.1);
+    lastTime = timestamp;
+
+    if (state.mode === 'play' && state.playGame) {
+      // Accumulate time for fixed-step physics
+      state.playGame.accumulator = (state.playGame.accumulator || 0) + frameTime;
+
+      const input = getInput();
+
+      // Process shot if released and has power
+      if (input.released && input.shotPower > 0 && !state.playGame.rolling) {
+        const curvedPower = input.shotPower * input.shotPower;
+        const actualPower = curvedPower * MAX_POWER;
+        launchBall(state.playGame.ball, input.shotAngle, actualPower);
+        state.playGame.strokes += 1;
+        state.playGame.rolling = true;
+        resetInput();
+        state.fakeGame.input = {};
+        state.fakeGame.state = 'rolling';
+      } else if (!input.released) {
+        // Mirror input into fakeGame so render.js draws the aim line
+        state.fakeGame.input = input;
+      }
+
+      // Run fixed physics steps
+      while (state.playGame.accumulator >= DT) {
+        state.playGame.accumulator -= DT;
+
+        if (state.playGame.rolling) {
+          const courseWithTime = { ...state.wipHole, time: state.playGame.time };
+          const result = stepBall(state.playGame.ball, courseWithTime, DT);
+          state.playGame.time += DT;
+
+          if (result.sunk) {
+            showToast(`Sunk in ${state.playGame.strokes} stroke${state.playGame.strokes !== 1 ? 's' : ''}!`);
+            // Reset ball to tee
+            state.playGame.ball = {
+              x: state.wipHole.tee.x,
+              y: state.wipHole.tee.y,
+              vx: 0,
+              vy: 0,
+            };
+            state.playGame.strokes = 0;
+            state.playGame.rolling = false;
+            state.fakeGame.state = 'aiming';
+          } else if (result.water) {
+            showToast('Water! Ball returned to tee.');
+            state.playGame.ball = {
+              x: state.wipHole.tee.x,
+              y: state.wipHole.tee.y,
+              vx: 0,
+              vy: 0,
+            };
+            state.playGame.rolling = false;
+            state.fakeGame.state = 'aiming';
+          } else if (state.playGame.ball.vx === 0 && state.playGame.ball.vy === 0) {
+            // Ball stopped
+            state.playGame.rolling = false;
+            state.fakeGame.state = 'aiming';
+          }
+        }
+      }
+
+      // Sync ball into fakeGame for render
+      state.fakeGame.ball = state.playGame.ball;
+
+      // Update play stats in sidebar
+      const statsEl = document.getElementById('editor-play-stats');
+      if (statsEl) {
+        const par = state.wipHole.par || 3;
+        statsEl.textContent = `Par: ${par} | Strokes: ${state.playGame.strokes}`;
+      }
+    } else {
+      // Edit mode: no ball displayed
+      state.fakeGame.ball = null;
+      state.fakeGame.input = {};
+    }
+
     state.fakeGame.currentHole = state.holeIndex;
     render(ctx, state.fakeGame, state.viewport, state.wipHole);
-    drawSelection(ctx, state);
+
+    if (state.mode === 'edit') {
+      drawSelection(ctx, state);
+      drawHandles(ctx, state);
+    }
+
     requestAnimationFrame(loop);
   }
+
   requestAnimationFrame(loop);
 }
 
@@ -823,6 +1510,9 @@ export async function startEditor({ canvas, ctx, editParam }) {
 
   hideGameUI();
 
+  // Store canvas reference for play mode initInput
+  canvas_ref = canvas;
+
   const holeIndex = 0;
   const wipHole = deepClone(COURSES[holeIndex]);
   const pristineHole = deepClone(COURSES[holeIndex]);
@@ -832,29 +1522,30 @@ export async function startEditor({ canvas, ctx, editParam }) {
     wipHole,
     pristineHole,
     selected: null,
+    dragging: null,
     editorKey,
     saveStatus: null,
     saveError: '',
     viewport: { w: 0, h: 0, dpr: 1 },
     fakeGame: makeFakeGame(holeIndex),
+    mode: 'edit',
+    playGame: null,
   };
 
   // onChange triggers a sidebar refresh (not full rebuild)
   function onChange() {
-    // Sync fakeGame ball if tee moved
-    if (state.wipHole && state.wipHole.tee) {
-      state.fakeGame.ball = {
-        x: state.wipHole.tee.x,
-        y: state.wipHole.tee.y,
-        vx: 0,
-        vy: 0,
-      };
+    // In edit mode, keep fakeGame ball null (handles show instead of live ball)
+    if (state.mode === 'play' && state.playGame) {
+      // Ball is managed by play loop, don't clobber it
+    } else {
+      state.fakeGame.ball = null;
     }
     refreshSidebar(state, onChange);
   }
 
   buildSidebar(state, onChange);
   setupCanvas(canvas, ctx, state);
-  setupClickToSelect(canvas, state, onChange);
-  startRenderLoop(canvas, ctx, state);
+  setupPointerEvents(canvas, state, onChange);
+  setupDeleteKey(state, onChange);
+  startRenderLoop(canvas, ctx, state, onChange);
 }
