@@ -14,6 +14,7 @@ body.editor-active #game {
   left: 320px; /* sidebar width */
   right: 0;
   bottom: 0;
+  cursor: default; /* JS will override to grab/grabbing inline */
 }
 
 /* -------------------------------------------------------------------------
@@ -30,7 +31,7 @@ body.editor-active #game {
   border-right: 1px solid rgba(255, 255, 255, 0.08);
   overflow-y: auto;
   overflow-x: hidden;
-  z-index: 100;
+  z-index: 99; /* modals in style.css are z-index 100, sidebar stays below */
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -55,6 +56,20 @@ body.editor-active #game {
 #editor-sidebar::-webkit-scrollbar-thumb {
   background: rgba(255,255,255,0.15);
   border-radius: 3px;
+}
+
+/* Bottom fade on desktop - signals scrollable content below */
+#editor-sidebar::after {
+  content: '';
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 20px;
+  background: linear-gradient(180deg, transparent 0%, rgba(18, 18, 36, 0.97) 100%);
+  pointer-events: none;
+  margin-top: -20px;
+  flex-shrink: 0;
 }
 
 /* -------------------------------------------------------------------------
@@ -99,6 +114,7 @@ body.editor-active #game {
   font-size: 12px;
   padding: 5px 8px;
   width: 100%;
+  min-height: 36px;
   box-sizing: border-box;
   outline: none;
   transition: border-color 0.15s;
@@ -113,6 +129,11 @@ body.editor-active #game {
 .editor-input:focus {
   border-color: rgba(78, 205, 196, 0.6);
   background: rgba(255, 255, 255, 0.1);
+}
+
+.editor-input:focus-visible {
+  outline: 2px solid #4ecdc4;
+  outline-offset: 2px;
 }
 
 .editor-input:hover {
@@ -140,6 +161,7 @@ select.editor-input {
   font-size: 13px;
   font-weight: 600;
   padding: 8px 14px;
+  min-height: 36px;
   transition: opacity 0.15s, background 0.15s;
   text-align: center;
 }
@@ -147,6 +169,11 @@ select.editor-input {
 .editor-btn:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+.editor-btn:focus-visible {
+  outline: 2px solid #4ecdc4;
+  outline-offset: 2px;
 }
 
 .editor-btn-primary {
@@ -228,6 +255,9 @@ select.editor-input {
 .editor-elem-row {
   font-size: 12px;
   padding: 5px 8px;
+  min-height: 36px;
+  display: flex;
+  align-items: center;
   border-radius: 4px;
   cursor: pointer;
   color: #bbb;
@@ -238,6 +268,15 @@ select.editor-input {
 .editor-elem-row:hover {
   background: rgba(255, 255, 255, 0.08);
   color: #fff;
+}
+
+.editor-elem-row:active {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.editor-elem-row:focus-visible {
+  outline: 2px solid #4ecdc4;
+  outline-offset: 2px;
 }
 
 .editor-elem-row.selected {
@@ -289,11 +328,35 @@ select.editor-input {
 }
 
 .editor-save-status.success {
-  color: #4ecdc4;
+  color: #5be8df; /* slightly brighter teal for higher contrast on dark bg */
+  background: rgba(78, 205, 196, 0.10);
+  padding: 6px 8px;
+  border-radius: 4px;
 }
 
 .editor-save-status.error {
-  color: #ff6b6b;
+  color: #ff8585; /* lighter red for WCAG AA contrast on dark bg */
+  background: rgba(255, 107, 107, 0.10);
+  padding: 6px 8px;
+  border-radius: 4px;
+}
+
+/* -------------------------------------------------------------------------
+   Touch tap targets (pointer: coarse = touchscreen)
+   ------------------------------------------------------------------------- */
+
+@media (pointer: coarse) {
+  .editor-elem-row {
+    min-height: 44px;
+  }
+
+  .editor-input {
+    min-height: 44px;
+  }
+
+  .editor-btn {
+    min-height: 44px;
+  }
 }
 
 /* -------------------------------------------------------------------------
@@ -305,20 +368,24 @@ select.editor-input {
     top: auto;
     bottom: 0;
     left: 0;
-    right: 0;
-    width: 100%;
-    height: auto;
+    width: 100vw;
+    height: 50vh;
     max-height: 50vh;
     border-right: none;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
     flex-direction: column;
     overflow-y: auto;
   }
 
+  /* Hide bottom fade on mobile - save button is at bottom and must remain visible */
+  #editor-sidebar::after {
+    display: none;
+  }
+
   body.editor-active #game {
     left: 0;
-    bottom: 0;
-    /* canvas fills top half on mobile */
-    height: 50vh;
+    bottom: 50vh; /* push canvas above the drawer */
+    height: 50vh !important; /* override style.css #game { height: 100vh } */
+    width: 100vw !important;
   }
 }
