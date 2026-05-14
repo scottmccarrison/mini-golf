@@ -1471,7 +1471,7 @@ function drawGridOverlay(ctx, state) {
   if (!hole || !hole.bounds) return;
   ctx.save();
   // Faint lines every GRID_SIZE world units
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.07)';
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.10)';
   ctx.lineWidth = 1;
   for (let x = 0; x <= hole.bounds.width; x += GRID_SIZE) {
     const top = worldToScreen(x, 0, state.fakeGame, state.viewport, hole);
@@ -1490,7 +1490,7 @@ function drawGridOverlay(ctx, state) {
     ctx.stroke();
   }
   // Slightly stronger every 100 world units for visual rhythm
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.18)';
   for (let x = 0; x <= hole.bounds.width; x += 100) {
     const top = worldToScreen(x, 0, state.fakeGame, state.viewport, hole);
     const bot = worldToScreen(x, hole.bounds.height, state.fakeGame, state.viewport, hole);
