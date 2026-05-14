@@ -145,9 +145,18 @@ function traceWallLoop(walls, seedIdx, used) {
     let found = false;
     for (let i = 0; i < walls.length; i++) {
       if (used.has(i)) continue;
+      let nextPt = null;
+      // Try forward direction (wall.x1 -> wall.x2)
       if (Math.abs(walls[i].x1 - current.x) < eps && Math.abs(walls[i].y1 - current.y) < eps) {
-        pts.push({ x: walls[i].x2, y: walls[i].y2 });
-        current = { x: walls[i].x2, y: walls[i].y2 };
+        nextPt = { x: walls[i].x2, y: walls[i].y2 };
+      }
+      // Try reverse direction (wall.x2 -> wall.x1) so users can draw walls in any orientation
+      else if (Math.abs(walls[i].x2 - current.x) < eps && Math.abs(walls[i].y2 - current.y) < eps) {
+        nextPt = { x: walls[i].x1, y: walls[i].y1 };
+      }
+      if (nextPt) {
+        pts.push(nextPt);
+        current = nextPt;
         used.add(i);
         found = true;
         break;
