@@ -227,14 +227,15 @@ function drawSlopes(ctx, course) {
     tracePolygon(ctx, slope.points);
     ctx.clip();
 
-    // Arrow grid showing force direction
-    const spacing = 55;
-    const arrowLen = 14;
-    const headLen = 5;
+    // Arrow grid showing force direction. Tan/earth tone with the same
+    // sizing as speed pads so direction is legible at a glance.
+    const spacing = 50;
+    const arrowLen = 26;
+    const headLen = 9;
     const perpX = -dy;
     const perpY = dx;
-    ctx.strokeStyle = 'rgba(255,255,255,0.22)';
-    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = 'rgba(218,165,90,0.75)';
+    ctx.lineWidth = 2;
     ctx.lineCap = 'round';
     for (let ax = bx; ax < bx + bw + spacing; ax += spacing) {
       for (let ay = by; ay < by + bh + spacing; ay += spacing) {
