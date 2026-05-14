@@ -72,57 +72,43 @@ function tracePolygon(ctx, points) {
 function drawCourseFloor(ctx, course) {
   if (!course.walls || course.walls.length === 0) return;
 
-  // Trace the outer boundary: follow connected wall segments starting from wall[0].
-  // Stop when we loop back to the start point or run out of connected walls.
-  // This skips internal walls (islands, chicanes) that aren't part of the outer perimeter.
-  const outerPts = [];
   const walls = course.walls;
   const used = new Set();
+  const loops = [];
 
-  // Start with the first wall
-  outerPts.push({ x: walls[0].x1, y: walls[0].y1 });
-  outerPts.push({ x: walls[0].x2, y: walls[0].y2 });
-  used.add(0);
-
-  // Follow the chain: find the next wall whose start matches our current end
-  let current = { x: walls[0].x2, y: walls[0].y2 };
-  const start = { x: walls[0].x1, y: walls[0].y1 };
-  const eps = 2;
-
-  for (let iter = 0; iter < walls.length; iter++) {
-    let found = false;
+  // Find every closed loop in the wall graph by seeding from each unvisited wall.
+  while (used.size < walls.length) {
+    let seedIdx = -1;
     for (let i = 0; i < walls.length; i++) {
-      if (used.has(i)) continue;
-      if (Math.abs(walls[i].x1 - current.x) < eps && Math.abs(walls[i].y1 - current.y) < eps) {
-        outerPts.push({ x: walls[i].x2, y: walls[i].y2 });
-        current = { x: walls[i].x2, y: walls[i].y2 };
-        used.add(i);
-        found = true;
-        break;
-      }
+      if (!used.has(i)) { seedIdx = i; break; }
     }
-    if (!found) break;
-    // Check if we've looped back to start
-    if (Math.abs(current.x - start.x) < eps && Math.abs(current.y - start.y) < eps) break;
+    if (seedIdx === -1) break;
+
+    const loop = traceWallLoop(walls, seedIdx, used);
+    if (loop && loop.length >= 3) loops.push(loop);
   }
 
-  // Fill the outer boundary
-  ctx.beginPath();
-  ctx.moveTo(outerPts[0].x, outerPts[0].y);
-  for (let i = 1; i < outerPts.length; i++) {
-    ctx.lineTo(outerPts[i].x, outerPts[i].y);
-  }
-  ctx.closePath();
+  if (loops.length === 0) return;
 
-  // Create a gradient for depth
+  // Course-wide gradient (consistent across all islands).
   const grad = ctx.createLinearGradient(0, 0, course.bounds.width * 0.3, course.bounds.height);
   grad.addColorStop(0, '#3aad61');
   grad.addColorStop(0.5, '#35a05a');
   grad.addColorStop(1, '#2d8a4e');
   ctx.fillStyle = grad;
+
+  // Build one path containing all loops and fill once.
+  ctx.beginPath();
+  for (const loop of loops) {
+    ctx.moveTo(loop[0].x, loop[0].y);
+    for (let i = 1; i < loop.length; i++) {
+      ctx.lineTo(loop[i].x, loop[i].y);
+    }
+    ctx.closePath();
+  }
   ctx.fill();
 
-  // Subtle felt texture: grid lines
+  // Subtle felt texture clipped to the same path.
   ctx.save();
   ctx.clip();
   ctx.strokeStyle = 'rgba(0,0,0,0.03)';
@@ -140,6 +126,43 @@ function drawCourseFloor(ctx, course) {
     ctx.stroke();
   }
   ctx.restore();
+}
+
+// Trace one closed loop starting from walls[seedIdx]. Marks visited walls in used.
+// Returns the polygon points (in order) or null if the loop didn't close.
+function traceWallLoop(walls, seedIdx, used) {
+  const pts = [];
+  pts.push({ x: walls[seedIdx].x1, y: walls[seedIdx].y1 });
+  pts.push({ x: walls[seedIdx].x2, y: walls[seedIdx].y2 });
+  used.add(seedIdx);
+
+  let current = { x: walls[seedIdx].x2, y: walls[seedIdx].y2 };
+  const start = { x: walls[seedIdx].x1, y: walls[seedIdx].y1 };
+  const eps = 2;
+  let closed = false;
+
+  for (let iter = 0; iter < walls.length; iter++) {
+    let found = false;
+    for (let i = 0; i < walls.length; i++) {
+      if (used.has(i)) continue;
+      if (Math.abs(walls[i].x1 - current.x) < eps && Math.abs(walls[i].y1 - current.y) < eps) {
+        pts.push({ x: walls[i].x2, y: walls[i].y2 });
+        current = { x: walls[i].x2, y: walls[i].y2 };
+        used.add(i);
+        found = true;
+        break;
+      }
+    }
+    if (!found) break;
+    if (Math.abs(current.x - start.x) < eps && Math.abs(current.y - start.y) < eps) {
+      closed = true;
+      break;
+    }
+  }
+
+  // Only return points if the loop actually closed back on itself.
+  // Otherwise the walls form an open chain (e.g., hole 6's arch); skip filling.
+  return closed ? pts : null;
 }
 
 // ---------------------------------------------------------------------------

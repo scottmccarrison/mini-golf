@@ -12,6 +12,10 @@ const STORAGE_KEY = 'golf-editor-key';
 const IS_TOUCH = typeof window !== 'undefined' &&
   ('ontouchstart' in window || matchMedia('(pointer: coarse)').matches);
 
+// Snap grid and endpoint-snap radius
+const GRID_SIZE = 10;
+const SNAP_RADIUS_SCREEN = IS_TOUCH ? 18 : 12;  // screen px
+
 // Handle sizes in screen px
 const HANDLE_SIZE = IS_TOUCH ? 24 : 12;
 const HANDLE_RADIUS_SIZE = IS_TOUCH ? 16 : 8;
@@ -23,6 +27,80 @@ const HANDLE_COLOR_RADIUS = '#ffe500';
 
 function apiUrl() {
   return location.pathname.startsWith('/golf') ? '/golf/api/edit/save-hole' : '/api/edit/save-hole';
+}
+
+// ---------------------------------------------------------------------------
+// Snap helpers
+// ---------------------------------------------------------------------------
+
+function isRadiusRole(role) {
+  return role === 'radius' || role === 'a-radius' || role === 'b-radius';
+}
+
+// Returns world-space coords of every snappable anchor on a hole.
+// Excludes radius handles - radii are distances, not snap targets.
+function getAllAnchors(hole) {
+  const anchors = [];
+  if (!hole) return anchors;
+  if (hole.tee) anchors.push({ x: hole.tee.x, y: hole.tee.y, type: 'tee', elIdx: 0, role: 'center' });
+  if (hole.hole) anchors.push({ x: hole.hole.x, y: hole.hole.y, type: 'cup', elIdx: 0, role: 'center' });
+  hole.walls?.forEach((w, i) => {
+    anchors.push({ x: w.x1, y: w.y1, type: 'walls', elIdx: i, role: 'p1' });
+    anchors.push({ x: w.x2, y: w.y2, type: 'walls', elIdx: i, role: 'p2' });
+  });
+  hole.oneWayGates?.forEach((g, i) => {
+    anchors.push({ x: g.x1, y: g.y1, type: 'oneWayGates', elIdx: i, role: 'p1' });
+    anchors.push({ x: g.x2, y: g.y2, type: 'oneWayGates', elIdx: i, role: 'p2' });
+  });
+  hole.bumpers?.forEach((b, i) => anchors.push({ x: b.x, y: b.y, type: 'bumpers', elIdx: i, role: 'center' }));
+  hole.magnets?.forEach((m, i) => anchors.push({ x: m.x, y: m.y, type: 'magnets', elIdx: i, role: 'center' }));
+  hole.teleporters?.forEach((t, i) => {
+    anchors.push({ x: t.a.x, y: t.a.y, type: 'teleporters', elIdx: i, role: 'a-center' });
+    anchors.push({ x: t.b.x, y: t.b.y, type: 'teleporters', elIdx: i, role: 'b-center' });
+  });
+  hole.movingObstacles?.forEach((o, i) => {
+    if (o.pivot) anchors.push({ x: o.pivot.x, y: o.pivot.y, type: 'movingObstacles', elIdx: i, role: 'pivot' });
+  });
+  for (const polyKey of ['sandTraps', 'waterHazards', 'slopes', 'speedPads']) {
+    hole[polyKey]?.forEach((p, i) => {
+      p.points?.forEach((pt, vIdx) => {
+        anchors.push({ x: pt.x, y: pt.y, type: polyKey, elIdx: i, role: 'vertex', vertexIdx: vIdx });
+      });
+    });
+  }
+  return anchors;
+}
+
+// Find nearest anchor (excluding the one being dragged) within SNAP_RADIUS_SCREEN.
+// Returns {x, y} in world coords, or null.
+function findSnapTarget(world, state) {
+  const anchors = getAllAnchors(state.wipHole);
+  const drag = state.dragging;
+  // Convert screen snap radius to world units via current viewport scale.
+  const a = worldToScreen(0, 0, state.fakeGame, state.viewport, state.wipHole);
+  const b = worldToScreen(1, 0, state.fakeGame, state.viewport, state.wipHole);
+  const screenPerWorld = Math.abs(b.x - a.x) || 1;
+  const worldRadius = SNAP_RADIUS_SCREEN / screenPerWorld;
+
+  let best = null;
+  let bestDist = worldRadius;
+  for (const anchor of anchors) {
+    if (isSameAnchor(anchor, drag)) continue;
+    const d = Math.hypot(anchor.x - world.x, anchor.y - world.y);
+    if (d < bestDist) {
+      best = anchor;
+      bestDist = d;
+    }
+  }
+  return best ? { x: best.x, y: best.y } : null;
+}
+
+function isSameAnchor(anchor, drag) {
+  if (!drag) return false;
+  if (anchor.type !== drag.type || anchor.elIdx !== drag.elIdx) return false;
+  if (anchor.role !== drag.role) return false;
+  if (anchor.role === 'vertex' && anchor.vertexIdx !== drag.vertexIdx) return false;
+  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -256,7 +334,7 @@ function getHandles(hole) {
 
 function getDragCenter(hole, drag) {
   const { type, elIdx, role } = drag;
-  if (type === 'cup' && role === 'radius') return { x: hole.hole.x, y: hole.hole.y };
+  if (type === 'cup' && role === 'radius') return hole.hole ? { x: hole.hole.x, y: hole.hole.y } : null;
   if (type === 'bumpers' && role === 'radius') {
     const b = hole.bumpers[elIdx];
     return b ? { x: b.x, y: b.y } : null;
@@ -450,6 +528,7 @@ function buildSidebar(state, onChange) {
     state.pristineHole = deepClone(COURSES[idx]);
     state.selected = null;
     state.dragging = null;
+    state.snapTarget = null;
     // Exit play mode if active
     if (state.mode === 'play') exitPlayMode(state);
     // Update fakeGame currentHole
@@ -467,6 +546,7 @@ function buildSidebar(state, onChange) {
     state.wipHole = deepClone(state.pristineHole);
     state.selected = null;
     state.dragging = null;
+    state.snapTarget = null;
     if (state.mode === 'play') exitPlayMode(state);
     onChange();
   });
@@ -1209,24 +1289,35 @@ function setupPointerEvents(canvas, state, onChange) {
 
     let world = screenToWorld(screenX, screenY, state.fakeGame, state.viewport, state.wipHole);
 
-    // Shift: snap to 10px grid. For radius handles, snap the distance from
-    // center instead so the resulting radius itself snaps cleanly.
-    if (e.shiftKey) {
-      if (state.dragging.role === 'radius' || state.dragging.role === 'a-radius' || state.dragging.role === 'b-radius') {
+    // Snap is ON by default; Shift disables. Endpoint-snap takes priority over grid-snap.
+    const snapEnabled = !e.shiftKey;
+    state.snapTarget = null;
+
+    if (snapEnabled) {
+      if (!isRadiusRole(state.dragging.role)) {
+        // Non-radius: try endpoint snap first, fall back to grid snap.
+        const target = findSnapTarget(world, state);
+        if (target) {
+          world.x = target.x;
+          world.y = target.y;
+          state.snapTarget = { x: target.x, y: target.y };
+        } else {
+          world.x = Math.round(world.x / GRID_SIZE) * GRID_SIZE;
+          world.y = Math.round(world.y / GRID_SIZE) * GRID_SIZE;
+        }
+      } else {
+        // Radius role: snap the distance from center to multiples of GRID_SIZE.
         const c = getDragCenter(state.wipHole, state.dragging);
         if (c) {
           const dx = world.x - c.x;
           const dy = world.y - c.y;
           const dist = Math.sqrt(dx * dx + dy * dy);
-          const snapped = Math.max(10, Math.round(dist / 10) * 10);
+          const snapped = Math.max(GRID_SIZE, Math.round(dist / GRID_SIZE) * GRID_SIZE);
           if (dist > 0.01) {
             world.x = c.x + (dx / dist) * snapped;
             world.y = c.y + (dy / dist) * snapped;
           }
         }
-      } else {
-        world.x = Math.round(world.x / 10) * 10;
-        world.y = Math.round(world.y / 10) * 10;
       }
     }
 
@@ -1244,6 +1335,7 @@ function setupPointerEvents(canvas, state, onChange) {
   function endDrag(e) {
     if (!state.dragging) return;
     state.dragging = null;
+    state.snapTarget = null;
     try { canvas.releasePointerCapture(e.pointerId); } catch (_) {}
     refreshPropertiesPanel(state, onChange);
   }
@@ -1370,6 +1462,104 @@ function drawSelection(ctx, state) {
 }
 
 // ---------------------------------------------------------------------------
+// Visual overlays (edit mode only)
+// ---------------------------------------------------------------------------
+
+function drawGridOverlay(ctx, state) {
+  if (state.mode !== 'edit') return;
+  const hole = state.wipHole;
+  if (!hole || !hole.bounds) return;
+  ctx.save();
+  // Faint lines every GRID_SIZE world units
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.07)';
+  ctx.lineWidth = 1;
+  for (let x = 0; x <= hole.bounds.width; x += GRID_SIZE) {
+    const top = worldToScreen(x, 0, state.fakeGame, state.viewport, hole);
+    const bot = worldToScreen(x, hole.bounds.height, state.fakeGame, state.viewport, hole);
+    ctx.beginPath();
+    ctx.moveTo(top.x, top.y);
+    ctx.lineTo(bot.x, bot.y);
+    ctx.stroke();
+  }
+  for (let y = 0; y <= hole.bounds.height; y += GRID_SIZE) {
+    const lf = worldToScreen(0, y, state.fakeGame, state.viewport, hole);
+    const rt = worldToScreen(hole.bounds.width, y, state.fakeGame, state.viewport, hole);
+    ctx.beginPath();
+    ctx.moveTo(lf.x, lf.y);
+    ctx.lineTo(rt.x, rt.y);
+    ctx.stroke();
+  }
+  // Slightly stronger every 100 world units for visual rhythm
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+  for (let x = 0; x <= hole.bounds.width; x += 100) {
+    const top = worldToScreen(x, 0, state.fakeGame, state.viewport, hole);
+    const bot = worldToScreen(x, hole.bounds.height, state.fakeGame, state.viewport, hole);
+    ctx.beginPath();
+    ctx.moveTo(top.x, top.y);
+    ctx.lineTo(bot.x, bot.y);
+    ctx.stroke();
+  }
+  for (let y = 0; y <= hole.bounds.height; y += 100) {
+    const lf = worldToScreen(0, y, state.fakeGame, state.viewport, hole);
+    const rt = worldToScreen(hole.bounds.width, y, state.fakeGame, state.viewport, hole);
+    ctx.beginPath();
+    ctx.moveTo(lf.x, lf.y);
+    ctx.lineTo(rt.x, rt.y);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawUnsealedIndicator(ctx, state) {
+  if (state.mode !== 'edit') return;
+  const hole = state.wipHole;
+  if (!hole) return;
+  const points = [];
+  hole.walls?.forEach(w => { points.push({ x: w.x1, y: w.y1 }); points.push({ x: w.x2, y: w.y2 }); });
+  hole.oneWayGates?.forEach(g => { points.push({ x: g.x1, y: g.y1 }); points.push({ x: g.x2, y: g.y2 }); });
+  if (points.length === 0) return;
+  // Bucket by rounded position. Eps = 2 matches drawCourseFloor tolerance.
+  const buckets = new Map();
+  for (const p of points) {
+    const key = Math.round(p.x / 2) * 2 + ',' + Math.round(p.y / 2) * 2;
+    buckets.set(key, (buckets.get(key) || 0) + 1);
+  }
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255, 96, 96, 0.85)';
+  ctx.lineWidth = 2;
+  for (const p of points) {
+    const key = Math.round(p.x / 2) * 2 + ',' + Math.round(p.y / 2) * 2;
+    if (buckets.get(key) === 1) {
+      const s = worldToScreen(p.x, p.y, state.fakeGame, state.viewport, hole);
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, 8, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+function drawSnapTargetIndicator(ctx, state) {
+  if (state.mode !== 'edit' || !state.snapTarget) return;
+  const hole = state.wipHole;
+  const s = worldToScreen(state.snapTarget.x, state.snapTarget.y, state.fakeGame, state.viewport, hole);
+  ctx.save();
+  // Inner solid ring
+  ctx.strokeStyle = '#5be8df';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.arc(s.x, s.y, IS_TOUCH ? 18 : 14, 0, Math.PI * 2);
+  ctx.stroke();
+  // Outer soft halo
+  ctx.strokeStyle = 'rgba(91, 232, 223, 0.35)';
+  ctx.lineWidth = 6;
+  ctx.beginPath();
+  ctx.arc(s.x, s.y, IS_TOUCH ? 22 : 18, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
+// ---------------------------------------------------------------------------
 // Render loop
 // ---------------------------------------------------------------------------
 
@@ -1462,8 +1652,11 @@ function startRenderLoop(canvas, ctx, state, onChange) {
     render(ctx, state.fakeGame, state.viewport, state.wipHole);
 
     if (state.mode === 'edit') {
+      drawGridOverlay(ctx, state);
       drawSelection(ctx, state);
+      drawUnsealedIndicator(ctx, state);
       drawHandles(ctx, state);
+      drawSnapTargetIndicator(ctx, state);
     }
 
     requestAnimationFrame(loop);
