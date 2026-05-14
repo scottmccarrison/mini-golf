@@ -183,29 +183,44 @@ function drawSlopes(ctx, course) {
   for (const slope of course.slopes) {
     if (!slope.points || slope.points.length < 3) continue;
     const mag = Math.sqrt(slope.ax * slope.ax + slope.ay * slope.ay);
-    if (mag < 1e-6) continue;
-    const dx = slope.ax / mag;
-    const dy = slope.ay / mag;
+    const hasDirection = mag >= 1e-6;
+    const dx = hasDirection ? slope.ax / mag : 0;
+    const dy = hasDirection ? slope.ay / mag : 0;
 
     ctx.save();
 
-    // Subtle tint of the slope region (brighter where ball will end up)
+    // Subtle tint + outline so the polygon stays visible even with zero
+    // force (e.g. just-added slope, before user sets a direction).
     const bx = Math.min(...slope.points.map(p => p.x));
     const by = Math.min(...slope.points.map(p => p.y));
     const bw = Math.max(...slope.points.map(p => p.x)) - bx;
     const bh = Math.max(...slope.points.map(p => p.y)) - by;
     ctx.beginPath();
     tracePolygon(ctx, slope.points);
-    const slopeGrad = ctx.createLinearGradient(
-      bx - dx * bw,
-      by - dy * bh,
-      bx + bw + dx * bw,
-      by + bh + dy * bh
-    );
-    slopeGrad.addColorStop(0, 'rgba(255,255,255,0)');
-    slopeGrad.addColorStop(1, 'rgba(255,255,255,0.08)');
-    ctx.fillStyle = slopeGrad;
+    if (hasDirection) {
+      const slopeGrad = ctx.createLinearGradient(
+        bx - dx * bw,
+        by - dy * bh,
+        bx + bw + dx * bw,
+        by + bh + dy * bh
+      );
+      slopeGrad.addColorStop(0, 'rgba(255,255,255,0)');
+      slopeGrad.addColorStop(1, 'rgba(255,255,255,0.08)');
+      ctx.fillStyle = slopeGrad;
+    } else {
+      ctx.fillStyle = 'rgba(255,255,255,0.04)';
+    }
     ctx.fill();
+    ctx.beginPath();
+    tracePolygon(ctx, slope.points);
+    ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    if (!hasDirection) {
+      ctx.restore();
+      continue;
+    }
 
     // Clip to slope polygon for arrows
     ctx.beginPath();
@@ -255,24 +270,29 @@ function drawSpeedPads(ctx, course) {
   for (const pad of course.speedPads) {
     if (!pad.points || pad.points.length < 3) continue;
     const mag = Math.sqrt(pad.ax * pad.ax + pad.ay * pad.ay);
-    if (mag < 1e-6) continue;
-    const dx = pad.ax / mag;
-    const dy = pad.ay / mag;
+    const hasDirection = mag >= 1e-6;
+    const dx = hasDirection ? pad.ax / mag : 0;
+    const dy = hasDirection ? pad.ay / mag : 0;
 
     ctx.save();
 
-    // Cyan/yellow fill
+    // Cyan fill + outline - always visible so the polygon shows up even with
+    // zero force (just-added pad, before user sets a direction).
     ctx.beginPath();
     tracePolygon(ctx, pad.points);
     ctx.fillStyle = 'rgba(80,220,255,0.15)';
     ctx.fill();
 
-    // Outline
     ctx.beginPath();
     tracePolygon(ctx, pad.points);
     ctx.strokeStyle = 'rgba(80,220,255,0.5)';
     ctx.lineWidth = 1.5;
     ctx.stroke();
+
+    if (!hasDirection) {
+      ctx.restore();
+      continue;
+    }
 
     // Clip to pad polygon for arrows
     ctx.beginPath();

@@ -801,10 +801,13 @@ function addElement(state, type, onChange) {
       newEl = { points: square80() };
       break;
     case 'slopes':
-      newEl = { points: square80(), ax: 0, ay: 0 };
+      // Default to a gentle downward push so the slope is immediately visible
+      // with arrows. User edits Force X/Y in the properties panel to tune.
+      newEl = { points: square80(), ax: 0, ay: 100 };
       break;
     case 'speedPads':
-      newEl = { points: square80(), ax: 0, ay: 0 };
+      // Default to a moderate upward boost so the pad is immediately visible.
+      newEl = { points: square80(), ax: 0, ay: -500 };
       break;
     case 'magnets':
       newEl = { x: cx, y: cy, strength: 200, radius: 150 };
@@ -1109,8 +1112,8 @@ function refreshPropertiesPanel(state, onChange) {
     const el = h[type][index];
     const pts = (el.points || []).length;
     body.appendChild(readonlyInfo(`${pts} vertices (drag handles to reshape)`));
-    body.appendChild(numField('ax', () => el.ax, v => { el.ax = v; }, 0.1));
-    body.appendChild(numField('ay', () => el.ay, v => { el.ay = v; }, 0.1));
+    body.appendChild(numField('Force X', () => el.ax, v => { el.ax = v; }, 0.1));
+    body.appendChild(numField('Force Y', () => el.ay, v => { el.ay = v; }, 0.1));
   } else if (type === 'movingObstacles') {
     const el = h.movingObstacles[index];
     body.appendChild(readonlyInfo(`type: ${el.type || 'windmill'}`));
