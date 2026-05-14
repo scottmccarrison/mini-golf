@@ -31,8 +31,8 @@ function getCourseTransform(course, viewport, zoom) {
 /**
  * Convert world (course) coordinates to screen coordinates.
  */
-export function worldToScreen(wx, wy, game, viewport) {
-  const course = COURSES[game.currentHole || 0];
+export function worldToScreen(wx, wy, game, viewport, courseOverride = null) {
+  const course = courseOverride || COURSES[game.currentHole || 0];
   const { scale, offsetX, offsetY } = getCourseTransform(course, viewport, game.zoom);
   return {
     x: wx * scale + offsetX,
@@ -43,8 +43,8 @@ export function worldToScreen(wx, wy, game, viewport) {
 /**
  * Convert screen coordinates to world (course) coordinates.
  */
-export function screenToWorld(sx, sy, game, viewport) {
-  const course = COURSES[game.currentHole || 0];
+export function screenToWorld(sx, sy, game, viewport, courseOverride = null) {
+  const course = courseOverride || COURSES[game.currentHole || 0];
   const { scale, offsetX, offsetY } = getCourseTransform(course, viewport, game.zoom);
   return {
     x: (sx - offsetX) / scale,
@@ -1830,7 +1830,7 @@ function applyScreenShake(ctx, shakeMagnitude) {
  * @param {object} game
  * @param {{ w: number, h: number, dpr: number }} viewport
  */
-export function render(ctx, game, viewport) {
+export function render(ctx, game, viewport, courseOverride = null) {
   const { w, h } = viewport;
 
   // Resolve game fields with safe defaults
@@ -1875,13 +1875,13 @@ export function render(ctx, game, viewport) {
   // Game over screen
   if (state === 'gameover') {
     // Still draw the course behind the overlay
-    drawCourseAndGame(ctx, game, viewport, currentHole, strokes, ball, balls, trail, input, time, animState, playerColor);
+    drawCourseAndGame(ctx, game, viewport, currentHole, strokes, ball, balls, trail, input, time, animState, playerColor, courseOverride);
     drawGameOver(ctx, game, viewport);
     return;
   }
 
   // Normal game rendering
-  drawCourseAndGame(ctx, game, viewport, currentHole, strokes, ball, balls, trail, input, time, animState, playerColor);
+  drawCourseAndGame(ctx, game, viewport, currentHole, strokes, ball, balls, trail, input, time, animState, playerColor, courseOverride);
 
   // Hole transition overlay
   if (state === 'nextHole' && animState.holeTransition < 1) {
@@ -1892,9 +1892,9 @@ export function render(ctx, game, viewport) {
 /**
  * Internal: draw the course and all game elements (used for game and gameover states).
  */
-function drawCourseAndGame(ctx, game, viewport, currentHole, strokes, ball, balls, trail, input, time, animState, playerColor) {
+function drawCourseAndGame(ctx, game, viewport, currentHole, strokes, ball, balls, trail, input, time, animState, playerColor, courseOverride = null) {
   const { w, h } = viewport;
-  const course = COURSES[currentHole];
+  const course = courseOverride || COURSES[currentHole];
   if (!course) return;
 
   const { scale, offsetX, offsetY } = getCourseTransform(course, viewport, game.zoom);
