@@ -334,7 +334,7 @@ function getHandles(hole) {
 
 function getDragCenter(hole, drag) {
   const { type, elIdx, role } = drag;
-  if (type === 'cup' && role === 'radius') return { x: hole.hole.x, y: hole.hole.y };
+  if (type === 'cup' && role === 'radius') return hole.hole ? { x: hole.hole.x, y: hole.hole.y } : null;
   if (type === 'bumpers' && role === 'radius') {
     const b = hole.bumpers[elIdx];
     return b ? { x: b.x, y: b.y } : null;
@@ -528,6 +528,7 @@ function buildSidebar(state, onChange) {
     state.pristineHole = deepClone(COURSES[idx]);
     state.selected = null;
     state.dragging = null;
+    state.snapTarget = null;
     // Exit play mode if active
     if (state.mode === 'play') exitPlayMode(state);
     // Update fakeGame currentHole
@@ -545,6 +546,7 @@ function buildSidebar(state, onChange) {
     state.wipHole = deepClone(state.pristineHole);
     state.selected = null;
     state.dragging = null;
+    state.snapTarget = null;
     if (state.mode === 'play') exitPlayMode(state);
     onChange();
   });
