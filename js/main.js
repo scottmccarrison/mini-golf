@@ -13,6 +13,16 @@ import { CHANGELOG } from './changelog.js';
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 
+// Editor mode: intercept ?edit=<key> before anything else
+{
+  const _editParam = new URLSearchParams(window.location.search).get('edit');
+  if (_editParam) {
+    const { startEditor } = await import('./editor.js');
+    await startEditor({ canvas, ctx, editParam: _editParam });
+    throw new Error('__editor_mode__');
+  }
+}
+
 let viewport = { w: 0, h: 0, dpr: 1 };
 let game = createGame();
 

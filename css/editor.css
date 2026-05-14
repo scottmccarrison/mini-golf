@@ -1,0 +1,324 @@
+/* editor.css - Styles for build/edit mode sidebar and controls */
+
+/* -------------------------------------------------------------------------
+   Body state when editor is active
+   ------------------------------------------------------------------------- */
+
+body.editor-active {
+  overflow: hidden;
+}
+
+body.editor-active #game {
+  position: fixed;
+  top: 0;
+  left: 320px; /* sidebar width */
+  right: 0;
+  bottom: 0;
+}
+
+/* -------------------------------------------------------------------------
+   Sidebar
+   ------------------------------------------------------------------------- */
+
+#editor-sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 320px;
+  height: 100vh;
+  background: rgba(18, 18, 36, 0.97);
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+  overflow-y: auto;
+  overflow-x: hidden;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  font-size: 13px;
+  color: #ddd;
+  box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.15) transparent;
+}
+
+#editor-sidebar.hidden {
+  display: none;
+}
+
+#editor-sidebar::-webkit-scrollbar {
+  width: 5px;
+}
+#editor-sidebar::-webkit-scrollbar-track {
+  background: transparent;
+}
+#editor-sidebar::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.15);
+  border-radius: 3px;
+}
+
+/* -------------------------------------------------------------------------
+   Sections
+   ------------------------------------------------------------------------- */
+
+.editor-section {
+  padding: 12px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.editor-section-title {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.4);
+  margin-bottom: 2px;
+}
+
+/* -------------------------------------------------------------------------
+   Inputs and labels
+   ------------------------------------------------------------------------- */
+
+.editor-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: #bbb;
+  font-size: 12px;
+}
+
+.editor-input {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 5px;
+  color: #fff;
+  font-size: 12px;
+  padding: 5px 8px;
+  width: 100%;
+  box-sizing: border-box;
+  outline: none;
+  transition: border-color 0.15s;
+  font-family: inherit;
+}
+
+.editor-label .editor-input {
+  width: 120px;
+  flex-shrink: 0;
+}
+
+.editor-input:focus {
+  border-color: rgba(78, 205, 196, 0.6);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.editor-input:hover {
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+select.editor-input {
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23888' d='M0 0l6 8 6-8z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 28px;
+}
+
+/* -------------------------------------------------------------------------
+   Buttons
+   ------------------------------------------------------------------------- */
+
+.editor-btn {
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 14px;
+  transition: opacity 0.15s, background 0.15s;
+  text-align: center;
+}
+
+.editor-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.editor-btn-primary {
+  background: #2d8a4e;
+  color: #fff;
+  width: 100%;
+}
+
+.editor-btn-primary:not(:disabled):hover {
+  background: #35a05a;
+}
+
+.editor-btn-secondary {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ccc;
+  width: 100%;
+}
+
+.editor-btn-secondary:not(:disabled):hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+/* -------------------------------------------------------------------------
+   Element list
+   ------------------------------------------------------------------------- */
+
+#editor-elements-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.editor-elem-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.editor-elem-group-header {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.55);
+  padding: 5px 6px 4px;
+  cursor: pointer;
+  border-radius: 4px;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  transition: background 0.12s;
+}
+
+.editor-elem-group-header::before {
+  content: '';
+  display: inline-block;
+  width: 0;
+  height: 0;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 5px solid rgba(255,255,255,0.4);
+  transition: transform 0.15s;
+  transform: rotate(90deg);
+  flex-shrink: 0;
+}
+
+.editor-elem-group-header.collapsed::before {
+  transform: rotate(0deg);
+}
+
+.editor-elem-group-header:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.editor-elem-group-rows {
+  display: flex;
+  flex-direction: column;
+  padding-left: 14px;
+}
+
+.editor-elem-row {
+  font-size: 12px;
+  padding: 5px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  color: #bbb;
+  transition: background 0.12s, color 0.12s;
+  user-select: none;
+}
+
+.editor-elem-row:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.editor-elem-row.selected {
+  background: rgba(78, 205, 196, 0.18);
+  color: #4ecdc4;
+  font-weight: 600;
+}
+
+/* -------------------------------------------------------------------------
+   Properties panel
+   ------------------------------------------------------------------------- */
+
+.editor-empty {
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 12px;
+  font-style: italic;
+  padding: 4px 0;
+}
+
+.editor-readonly {
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 12px;
+  font-style: italic;
+  padding: 4px 2px;
+}
+
+/* -------------------------------------------------------------------------
+   Save section
+   ------------------------------------------------------------------------- */
+
+.editor-save-section {
+  margin-top: auto;
+  position: sticky;
+  bottom: 0;
+  background: rgba(18, 18, 36, 0.98);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 14px;
+}
+
+.editor-save-status {
+  font-size: 12px;
+  min-height: 18px;
+  text-align: center;
+  transition: color 0.2s;
+}
+
+.editor-save-status.saving {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.editor-save-status.success {
+  color: #4ecdc4;
+}
+
+.editor-save-status.error {
+  color: #ff6b6b;
+}
+
+/* -------------------------------------------------------------------------
+   Responsive: mobile - sidebar becomes bottom drawer
+   ------------------------------------------------------------------------- */
+
+@media (max-width: 768px) {
+  #editor-sidebar {
+    top: auto;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    height: auto;
+    max-height: 50vh;
+    border-right: none;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  body.editor-active #game {
+    left: 0;
+    bottom: 0;
+    /* canvas fills top half on mobile */
+    height: 50vh;
+  }
+}
