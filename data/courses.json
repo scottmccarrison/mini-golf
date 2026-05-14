@@ -4,14 +4,14 @@
     "name": "Slingshot",
     "par": 2,
     "tee": {
-      "x": 120,
+      "x": 125.6900212314225,
       "y": 300
     },
     "hole": {
       "x": 680,
       "y": 300
     },
-    "holeRadius": 12,
+    "holeRadius": 15.522827182246132,
     "bounds": {
       "width": 800,
       "height": 600
