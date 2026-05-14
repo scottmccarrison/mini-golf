@@ -13,7 +13,9 @@ export default {
     const prefix = (env.PATH_PREFIX || '/golf');
 
     if (url.pathname === prefix) {
-      return Response.redirect(url.origin + prefix + '/', 301);
+      // Preserve query string so e.g. /golf?edit=<key> doesn't lose the key
+      // on the bounce to /golf/.
+      return Response.redirect(url.origin + prefix + '/' + url.search, 301);
     }
 
     let path = url.pathname;
