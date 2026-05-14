@@ -254,6 +254,26 @@ function getHandles(hole) {
 // Apply a drag delta to wipHole based on drag state
 // ---------------------------------------------------------------------------
 
+function getDragCenter(hole, drag) {
+  const { type, elIdx, role } = drag;
+  if (type === 'cup' && role === 'radius') return { x: hole.hole.x, y: hole.hole.y };
+  if (type === 'bumpers' && role === 'radius') {
+    const b = hole.bumpers[elIdx];
+    return b ? { x: b.x, y: b.y } : null;
+  }
+  if (type === 'magnets' && role === 'radius') {
+    const m = hole.magnets[elIdx];
+    return m ? { x: m.x, y: m.y } : null;
+  }
+  if (type === 'teleporters') {
+    const t = hole.teleporters[elIdx];
+    if (!t) return null;
+    if (role === 'a-radius') return { x: t.a.x, y: t.a.y };
+    if (role === 'b-radius') return { x: t.b.x, y: t.b.y };
+  }
+  return null;
+}
+
 function applyDrag(hole, drag, worldX, worldY) {
   const { type, elIdx, role, vertexIdx } = drag;
 
@@ -1189,10 +1209,25 @@ function setupPointerEvents(canvas, state, onChange) {
 
     let world = screenToWorld(screenX, screenY, state.fakeGame, state.viewport, state.wipHole);
 
-    // Shift: snap to 10px grid
+    // Shift: snap to 10px grid. For radius handles, snap the distance from
+    // center instead so the resulting radius itself snaps cleanly.
     if (e.shiftKey) {
-      world.x = Math.round(world.x / 10) * 10;
-      world.y = Math.round(world.y / 10) * 10;
+      if (state.dragging.role === 'radius' || state.dragging.role === 'a-radius' || state.dragging.role === 'b-radius') {
+        const c = getDragCenter(state.wipHole, state.dragging);
+        if (c) {
+          const dx = world.x - c.x;
+          const dy = world.y - c.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          const snapped = Math.max(10, Math.round(dist / 10) * 10);
+          if (dist > 0.01) {
+            world.x = c.x + (dx / dist) * snapped;
+            world.y = c.y + (dy / dist) * snapped;
+          }
+        }
+      } else {
+        world.x = Math.round(world.x / 10) * 10;
+        world.y = Math.round(world.y / 10) * 10;
+      }
     }
 
     state.dragging.currentWorld = world;
@@ -1390,7 +1425,8 @@ function startRenderLoop(canvas, ctx, state, onChange) {
             state.playGame.rolling = false;
             state.fakeGame.state = 'aiming';
           } else if (result.water) {
-            showToast('Water! Ball returned to tee.');
+            state.playGame.strokes += 1;
+            showToast('Water! +1 stroke, ball returned to tee.');
             state.playGame.ball = {
               x: state.wipHole.tee.x,
               y: state.wipHole.tee.y,

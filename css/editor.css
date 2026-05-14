@@ -133,7 +133,7 @@ body.editor-active #game {
 
 .editor-input:focus-visible {
   outline: 2px solid #4ecdc4;
-  outline-offset: 2px;
+  outline-offset: -2px;
 }
 
 .editor-input:hover {
@@ -173,7 +173,7 @@ select.editor-input {
 
 .editor-btn:focus-visible {
   outline: 2px solid #4ecdc4;
-  outline-offset: 2px;
+  outline-offset: -2px;
 }
 
 .editor-btn-primary {
@@ -276,7 +276,7 @@ select.editor-input {
 
 .editor-elem-row:focus-visible {
   outline: 2px solid #4ecdc4;
-  outline-offset: 2px;
+  outline-offset: -2px;
 }
 
 .editor-elem-row.selected {
