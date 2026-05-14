@@ -42,6 +42,10 @@ body.editor-active #game {
   scrollbar-color: rgba(255,255,255,0.15) transparent;
 }
 
+#editor-sidebar.hidden {
+  display: none;
+}
+
 #editor-sidebar::-webkit-scrollbar {
   width: 5px;
 }

@@ -1971,7 +1971,7 @@ function drawCourseAndGame(ctx, game, viewport, currentHole, strokes, ball, ball
     // Convert input screen coords to course space for drawing
     const screenInput = { ...input };
     if (input.aimCurrent) {
-      const worldCurrent = screenToWorld(input.aimCurrent.x, input.aimCurrent.y, game, viewport);
+      const worldCurrent = screenToWorld(input.aimCurrent.x, input.aimCurrent.y, game, viewport, courseOverride);
       screenInput.aimCurrent = worldCurrent;
     }
     drawAimLine(ctx, ball, screenInput);
