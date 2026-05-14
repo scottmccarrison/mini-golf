@@ -250,40 +250,32 @@ const hole4 = {
   movingObstacles: [],
   slopes: [],
   speedPads: [
-    // Right arm - push outward (east). 30px buffer to dead-end wall (x=870)
-    // so the ball can rest off-pad after bouncing.
-    {
-      points: [
-        { x: 650, y: 450 },
-        { x: 840, y: 450 },
-        { x: 840, y: 550 },
-        { x: 650, y: 550 },
-      ],
-      ax: 1200,
-      ay: 0,
-    },
-    // Left arm - mirrors right arm with same 30px buffer to wall (x=30).
-    {
-      points: [
-        { x: 60,  y: 450 },
-        { x: 250, y: 450 },
-        { x: 250, y: 550 },
-        { x: 60,  y: 550 },
-      ],
-      ax: -1200,
-      ay: 0,
-    },
-    // Top arm - push toward hole. 30px buffer on top/left/right walls.
-    {
-      points: [
-        { x: 380, y: 60  },
-        { x: 520, y: 60  },
-        { x: 520, y: 130 },
-        { x: 380, y: 130 },
-      ],
-      ax: 0,
-      ay: -600,
-    },
+    // Conveyors split into 4 angled strips per side arm (and 3 per top arm).
+    // Strips are 12px wide x 80px long, tilted 15deg from vertical. Each strip
+    // is a one-shot boost on entry, so the gaps between strips let the ball
+    // settle if its momentum dies; the tilted force direction also imparts a
+    // perpendicular drift so the ball drifts off-axis with each wall bounce
+    // instead of locking into the pad-wall-pad oscillation we hit with one
+    // big pad.
+
+    // Right arm: 4 / strips, force ESE (east + slight south drift).
+    { points: [{ x: 685, y: 460 }, { x: 696, y: 463 }, { x: 675, y: 540 }, { x: 664, y: 537 }], ax: 290, ay: 78 },
+    { points: [{ x: 725, y: 460 }, { x: 736, y: 463 }, { x: 715, y: 540 }, { x: 704, y: 537 }], ax: 290, ay: 78 },
+    { points: [{ x: 765, y: 460 }, { x: 776, y: 463 }, { x: 755, y: 540 }, { x: 744, y: 537 }], ax: 290, ay: 78 },
+    { points: [{ x: 805, y: 460 }, { x: 816, y: 463 }, { x: 795, y: 540 }, { x: 784, y: 537 }], ax: 290, ay: 78 },
+
+    // Left arm: 4 \ strips, mirror of right - force WSW (west + slight south).
+    { points: [{ x: 95,  y: 460 }, { x: 84,  y: 463 }, { x: 105, y: 540 }, { x: 116, y: 537 }], ax: -290, ay: 78 },
+    { points: [{ x: 135, y: 460 }, { x: 124, y: 463 }, { x: 145, y: 540 }, { x: 156, y: 537 }], ax: -290, ay: 78 },
+    { points: [{ x: 175, y: 460 }, { x: 164, y: 463 }, { x: 185, y: 540 }, { x: 196, y: 537 }], ax: -290, ay: 78 },
+    { points: [{ x: 215, y: 460 }, { x: 204, y: 463 }, { x: 225, y: 540 }, { x: 236, y: 537 }], ax: -290, ay: 78 },
+
+    // Top arm: 3 horizontal-tilted strips (east end down), force NNE (up +
+    // slight east drift). Push ball toward cup; miss-bounces drift sideways
+    // instead of re-loading into a straight up-down oscillation.
+    { points: [{ x: 373, y: 79 }, { x: 450, y: 100 }, { x: 447, y: 111 }, { x: 370, y: 90 }], ax: 52, ay: -193 },
+    { points: [{ x: 413, y: 79 }, { x: 490, y: 100 }, { x: 487, y: 111 }, { x: 410, y: 90 }], ax: 52, ay: -193 },
+    { points: [{ x: 453, y: 79 }, { x: 530, y: 100 }, { x: 527, y: 111 }, { x: 450, y: 90 }], ax: 52, ay: -193 },
   ],
   magnets: [],
   oneWayGates: [],
