@@ -39,6 +39,11 @@ export default {
       return handleFeedback(request, env);
     }
 
+    // --- Editor: save hole ---
+    if (path === '/api/edit/save-hole' && request.method === 'POST') {
+      return saveHole(request, env);
+    }
+
     // --- Room create ---
     if (path === '/api/room' && request.method === 'POST') {
       const code = generateRoomCode();
@@ -173,6 +178,128 @@ async function handleFeedback(request, env) {
   }
   const data = await r.json();
   return json({ ok: true, url: data.html_url });
+}
+
+// ---------------------------------------------------------------------------
+// Editor: save a single hole by committing data/courses.json on main.
+// Auth: shared secret in x-editor-key header (env.EDITOR_KEY).
+// Repo write: env.GITHUB_REPO_TOKEN (fine-grained PAT, Contents:Write on
+// scottmccarrison/mini-golf). Kept separate from env.GITHUB_TOKEN (which is
+// the feedback Issues token) so we can scope blast radius.
+// ---------------------------------------------------------------------------
+async function saveHole(request, env) {
+  if (!env.EDITOR_KEY || request.headers.get('x-editor-key') !== env.EDITOR_KEY) {
+    return json({ error: 'unauthorized' }, 401);
+  }
+  if (!env.GITHUB_REPO_TOKEN) {
+    return json({ error: 'editor not configured: GITHUB_REPO_TOKEN missing' }, 500);
+  }
+
+  let body;
+  try { body = await request.json(); } catch { return json({ error: 'invalid json' }, 400); }
+
+  const holeIndex = Number(body.holeIndex);
+  const hole = body.hole;
+  if (!Number.isInteger(holeIndex) || holeIndex < 0 || holeIndex > 8) {
+    return json({ error: 'holeIndex must be integer 0..8' }, 400);
+  }
+  const shapeError = validateHoleShape(hole);
+  if (shapeError) return json({ error: shapeError }, 400);
+
+  // 1. Fetch current data/courses.json + its SHA.
+  const repo = 'scottmccarrison/mini-golf';
+  const filePath = 'data/courses.json';
+  const ghHeaders = {
+    'authorization': `Bearer ${env.GITHUB_REPO_TOKEN}`,
+    'accept': 'application/vnd.github+json',
+    'user-agent': 'mini-golf-editor',
+  };
+  const getRes = await fetch(
+    `https://api.github.com/repos/${repo}/contents/${filePath}?ref=main`,
+    { headers: ghHeaders }
+  );
+  if (!getRes.ok) {
+    const text = await getRes.text();
+    return json({ error: 'github GET failed', status: getRes.status, detail: text.slice(0, 500) }, 502);
+  }
+  const fileMeta = await getRes.json();
+  const currentSha = fileMeta.sha;
+  let courses;
+  try {
+    courses = JSON.parse(base64ToUtf8(fileMeta.content));
+  } catch (e) {
+    return json({ error: 'failed to parse current courses.json', detail: String(e) }, 500);
+  }
+  if (!Array.isArray(courses) || courses.length !== 9) {
+    return json({ error: 'unexpected courses.json shape' }, 500);
+  }
+
+  // 2. Splice in new hole, re-emit pretty JSON (preserves diff readability).
+  courses[holeIndex] = hole;
+  const newContent = JSON.stringify(courses, null, 2) + '\n';
+  const newContentB64 = utf8ToBase64(newContent);
+
+  // 3. PUT updated file to main.
+  const safeName = String(hole.name || `hole-${holeIndex + 1}`).slice(0, 80);
+  const commitMessage = `editor: update hole ${holeIndex + 1} "${safeName}"`;
+  const putRes = await fetch(
+    `https://api.github.com/repos/${repo}/contents/${filePath}`,
+    {
+      method: 'PUT',
+      headers: { ...ghHeaders, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        message: commitMessage,
+        content: newContentB64,
+        sha: currentSha,
+        branch: 'main',
+      }),
+    }
+  );
+  if (!putRes.ok) {
+    const text = await putRes.text();
+    return json({ error: 'github PUT failed', status: putRes.status, detail: text.slice(0, 500) }, 502);
+  }
+  const putData = await putRes.json();
+  return json({
+    ok: true,
+    commitSha: putData.commit && putData.commit.sha,
+    holeIndex,
+    name: hole.name,
+  });
+}
+
+function utf8ToBase64(str) {
+  const bytes = new TextEncoder().encode(str);
+  let bin = '';
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin);
+}
+
+function base64ToUtf8(b64) {
+  const bin = atob(b64.replace(/\n/g, ''));
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new TextDecoder().decode(bytes);
+}
+
+function validateHoleShape(hole) {
+  if (!hole || typeof hole !== 'object') return 'hole must be object';
+  if (typeof hole.name !== 'string' || hole.name.length === 0) return 'hole.name required (string)';
+  if (!Number.isFinite(hole.par) || hole.par < 1 || hole.par > 20) return 'hole.par must be 1..20';
+  if (!Number.isFinite(hole.holeRadius) || hole.holeRadius < 4 || hole.holeRadius > 40) return 'hole.holeRadius must be 4..40';
+  if (!hole.bounds || !Number.isFinite(hole.bounds.width) || !Number.isFinite(hole.bounds.height)) return 'hole.bounds.{width,height} required';
+  if (hole.bounds.width < 200 || hole.bounds.height < 200) return 'hole.bounds dimensions too small (min 200)';
+  if (!hole.tee || !Number.isFinite(hole.tee.x) || !Number.isFinite(hole.tee.y)) return 'hole.tee.{x,y} required';
+  if (!hole.hole || !Number.isFinite(hole.hole.x) || !Number.isFinite(hole.hole.y)) return 'hole.hole.{x,y} required';
+  if (hole.tee.x < 0 || hole.tee.x > hole.bounds.width) return 'hole.tee.x outside bounds';
+  if (hole.tee.y < 0 || hole.tee.y > hole.bounds.height) return 'hole.tee.y outside bounds';
+  if (hole.hole.x < 0 || hole.hole.x > hole.bounds.width) return 'hole.hole.x outside bounds';
+  if (hole.hole.y < 0 || hole.hole.y > hole.bounds.height) return 'hole.hole.y outside bounds';
+  const arrayFields = ['walls', 'bumpers', 'sandTraps', 'waterHazards', 'movingObstacles', 'slopes', 'speedPads', 'magnets', 'oneWayGates', 'teleporters'];
+  for (const field of arrayFields) {
+    if (hole[field] !== undefined && !Array.isArray(hole[field])) return `hole.${field} must be array`;
+  }
+  return null;
 }
 
 function json(obj, status = 200) {
