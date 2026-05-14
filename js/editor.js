@@ -1060,6 +1060,60 @@ function refreshPropertiesPanel(state, onChange) {
     return label;
   }
 
+  // forceField: number input + range slider for vector force components.
+  // Both stay synced. Does NOT call onChange (would rebuild the sidebar and
+  // steal focus mid-drag); the canvas render loop reads wipHole every frame
+  // so visual updates are immediate. Save button state is refreshed.
+  function forceField(labelText, getter, setter) {
+    const FORCE_MIN = -2000;
+    const FORCE_MAX = 2000;
+    const wrap = document.createElement('div');
+    wrap.className = 'editor-force-field';
+
+    const top = document.createElement('label');
+    top.className = 'editor-label';
+    top.textContent = labelText + ' ';
+    const num = document.createElement('input');
+    num.className = 'editor-input';
+    num.type = 'number';
+    num.step = '10';
+    const startVal = Number(getter()) || 0;
+    num.value = String(startVal);
+    top.appendChild(num);
+    wrap.appendChild(top);
+
+    const slider = document.createElement('input');
+    slider.className = 'editor-slider';
+    slider.type = 'range';
+    slider.min = String(FORCE_MIN);
+    slider.max = String(FORCE_MAX);
+    slider.step = '10';
+    slider.value = String(Math.max(FORCE_MIN, Math.min(FORCE_MAX, startVal)));
+    wrap.appendChild(slider);
+
+    const ticks = document.createElement('div');
+    ticks.className = 'editor-slider-ticks';
+    ticks.innerHTML = `<span>${FORCE_MIN}</span><span>0</span><span>+${FORCE_MAX}</span>`;
+    wrap.appendChild(ticks);
+
+    num.addEventListener('input', () => {
+      const v = parseFloat(num.value);
+      if (!Number.isFinite(v)) return;
+      setter(v);
+      // Clamp slider to its range but allow num to hold out-of-range values
+      slider.value = String(Math.max(FORCE_MIN, Math.min(FORCE_MAX, v)));
+      refreshSaveButton(state);
+    });
+    slider.addEventListener('input', () => {
+      const v = parseFloat(slider.value);
+      setter(v);
+      num.value = String(v);
+      refreshSaveButton(state);
+    });
+
+    return wrap;
+  }
+
   function readonlyInfo(text) {
     const d = document.createElement('div');
     d.className = 'editor-readonly';
@@ -1112,8 +1166,8 @@ function refreshPropertiesPanel(state, onChange) {
     const el = h[type][index];
     const pts = (el.points || []).length;
     body.appendChild(readonlyInfo(`${pts} vertices (drag handles to reshape)`));
-    body.appendChild(numField('Force X', () => el.ax, v => { el.ax = v; }, 0.1));
-    body.appendChild(numField('Force Y', () => el.ay, v => { el.ay = v; }, 0.1));
+    body.appendChild(forceField('Force X', () => el.ax, v => { el.ax = v; }));
+    body.appendChild(forceField('Force Y', () => el.ay, v => { el.ay = v; }));
   } else if (type === 'movingObstacles') {
     const el = h.movingObstacles[index];
     body.appendChild(readonlyInfo(`type: ${el.type || 'windmill'}`));
