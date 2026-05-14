@@ -4,7 +4,7 @@ compatibility_date = "2025-01-01"
 
 routes = [
   { pattern = "mccarrison.me/golf", zone_name = "mccarrison.me" },
-  { pattern = "mccarrison.me/golf/*", zone_name = "mccarrison.me" },
+  { pattern = "mccarrison.me/golf*", zone_name = "mccarrison.me" },
 ]
 
 [vars]
