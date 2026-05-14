@@ -625,7 +625,7 @@ function setupClickToSelect(canvas, state, onChange) {
     const screenX = e.clientX - rect.left;
     const screenY = e.clientY - rect.top;
 
-    const world = screenToWorld(screenX, screenY, state.fakeGame, state.viewport);
+    const world = screenToWorld(screenX, screenY, state.fakeGame, state.viewport, state.wipHole);
     const hit = hitTest(world.x, world.y, state.wipHole);
 
     if (hit) {
@@ -651,7 +651,7 @@ function drawSelection(ctx, state) {
   const fg = state.fakeGame;
 
   function screenPt(wx, wy) {
-    return worldToScreen(wx, wy, fg, vp);
+    return worldToScreen(wx, wy, fg, vp, h);
   }
 
   function scaleVal(worldR) {
@@ -741,20 +741,9 @@ function drawSelection(ctx, state) {
 
 function startRenderLoop(canvas, ctx, state) {
   function loop() {
-    // Sync fakeGame hole to current wipHole for render
-    // Swap COURSES[holeIndex] with wipHole via render override if available,
-    // otherwise patch fakeGame.currentHole and let render use the wip copy
-    // by temporarily overriding COURSES array entry.
-    const origCourse = COURSES[state.holeIndex];
-    COURSES[state.holeIndex] = state.wipHole;
-
     state.fakeGame.currentHole = state.holeIndex;
-
-    render(ctx, state.fakeGame, state.viewport);
+    render(ctx, state.fakeGame, state.viewport, state.wipHole);
     drawSelection(ctx, state);
-
-    COURSES[state.holeIndex] = origCourse;
-
     requestAnimationFrame(loop);
   }
   requestAnimationFrame(loop);
