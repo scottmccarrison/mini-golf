@@ -523,6 +523,11 @@ function buildSidebar(state, onChange) {
   holePicker.value = String(state.holeIndex);
   holePicker.addEventListener('change', () => {
     const idx = parseInt(holePicker.value, 10);
+    if (!confirmDiscardIfDirty(state, 'You have unsaved changes on this hole. Discard them and switch?')) {
+      // Revert picker to current hole and bail
+      holePicker.value = String(state.holeIndex);
+      return;
+    }
     state.holeIndex = idx;
     state.wipHole = deepClone(COURSES[idx]);
     state.pristineHole = deepClone(COURSES[idx]);
@@ -543,6 +548,7 @@ function buildSidebar(state, onChange) {
   revertBtn.id = 'editor-revert';
   revertBtn.textContent = 'Revert';
   revertBtn.addEventListener('click', () => {
+    if (!confirmDiscardIfDirty(state, 'Discard all edits to this hole?')) return;
     state.wipHole = deepClone(state.pristineHole);
     state.selected = null;
     state.dragging = null;
@@ -848,6 +854,31 @@ function refreshSidebar(state, onChange) {
   fillMetaInputs(state);
   rebuildElementList(state, onChange);
   refreshPropertiesPanel(state, onChange);
+  refreshSaveButton(state);
+}
+
+// ---------------------------------------------------------------------------
+// Dirty tracking + save button enable/disable
+// ---------------------------------------------------------------------------
+
+function isHoleDirty(state) {
+  if (!state.wipHole || !state.pristineHole) return false;
+  return JSON.stringify(state.wipHole) !== JSON.stringify(state.pristineHole);
+}
+
+function refreshSaveButton(state) {
+  const saveBtn = document.getElementById('editor-save');
+  if (!saveBtn) return;
+  // Don't override while a save is in flight - save() manages disabled itself.
+  if (state.saveStatus === 'saving') return;
+  saveBtn.disabled = !isHoleDirty(state);
+}
+
+// confirm() wrapper that's only triggered when the hole is dirty.
+// Returns true if it's safe to proceed (no changes or user confirmed discard).
+function confirmDiscardIfDirty(state, message) {
+  if (!isHoleDirty(state)) return true;
+  return window.confirm(message);
 }
 
 // ---------------------------------------------------------------------------
@@ -1338,6 +1369,7 @@ function setupPointerEvents(canvas, state, onChange) {
     state.snapTarget = null;
     try { canvas.releasePointerCapture(e.pointerId); } catch (_) {}
     refreshPropertiesPanel(state, onChange);
+    refreshSaveButton(state);
   }
 
   canvas.addEventListener('pointerup', endDrag);
@@ -1722,7 +1754,9 @@ async function save(state) {
       statusEl.className = 'editor-save-status error';
     }
   } finally {
-    if (saveBtn) saveBtn.disabled = false;
+    // Defer to refreshSaveButton so the button stays disabled when wipHole
+    // matches pristineHole (i.e. successful save), but re-enables on error.
+    refreshSaveButton(state);
   }
 }
 
@@ -1777,4 +1811,16 @@ export async function startEditor({ canvas, ctx, editParam }) {
   setupPointerEvents(canvas, state, onChange);
   setupDeleteKey(state, onChange);
   startRenderLoop(canvas, ctx, state, onChange);
+
+  // Warn before unloading the page if there are unsaved edits.
+  // beforeunload requires preventDefault + returnValue for cross-browser support.
+  window.addEventListener('beforeunload', (e) => {
+    if (isHoleDirty(state)) {
+      e.preventDefault();
+      e.returnValue = '';
+    }
+  });
+
+  // Initial save button state (no edits yet => disabled).
+  refreshSaveButton(state);
 }
